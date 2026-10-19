@@ -1,0 +1,20 @@
+# Cline-Projektregeln — HostageTarget
+
+## Sprache
+- Dokumentation, Erklärungen und Antworten: **Deutsch**.
+- Code-Bezeichner (Variablen, Funktionen, Klassen): **Englisch**.
+
+## Grundsätze
+- `SystemSpecification.md` ist die maßgebliche Quelle; bei Widerspruch nachfragen.
+- Mechanische Maße (`D`, `L1`, `L2`, …) immer als zentrale `constexpr float`-Konstanten — leicht anpassbar, nie verstreut hartkodiert.
+- Einheiten: Längen in **mm**, Winkel intern in **Radiant** (Grad erst bei der PWM-Umrechnung).
+
+## Code-Struktur
+- Wiederverwendbare Klassen in `lib/` (werden von den Tests mitgebaut).
+- Arduino-Sketch nur in `src/main.cpp`.
+- Neue Logik immer mit Unit-Test in `test/` (Unity, nativ) absichern.
+
+## Qualität
+- Vor Abschluss einer Aufgabe Tests laufen lassen: `pio test -e test`.
+- IK-Solver muss ungültige Koordinaten ablehnen (`bool`-Rückgabe, siehe Spec §4).
+- Keine Build-Artefakte committen (`.pio/`, `build/` …).

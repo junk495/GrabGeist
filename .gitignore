@@ -1,0 +1,27 @@
+# ===== PlatformIO =====
+.pio/
+build/
+
+# ===== IDE / Editor =====
+.vscode/
+.idea/
+*.code-workspace
+*.suo
+*.user
+
+# ===== Betriebssystem =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Build-/Compile-Artefakte =====
+*.o
+*.obj
+*.elf
+*.map
+*.hex
+*.bin
+*.log
+
+# ===== Generierte Dateien =====
+compile_commands.json
