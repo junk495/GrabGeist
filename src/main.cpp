@@ -55,6 +55,21 @@ static bool     lastIkValid = false;
 static bool     directMode = false;   // true = Servos direkt ansteuern (RAW), IK/Planner pausiert
 
 // ---------------------------------------------------------------------------
+// Auto-Ablauf: links -> oben -> rechts -> versteckt -> links -> ...
+// 1 s Uebergang, 2 s Halten pro Position.
+// ---------------------------------------------------------------------------
+static const uint32_t AUTO_MOVE_MS = 1000;
+static const uint32_t AUTO_HOLD_MS = 2000;
+static const int      AUTO_STEP_COUNT = 4;
+
+static bool     autoActive = false;
+static int      autoStep = 0;
+static bool     autoMoving = false;      // true = Uebergang, false = Halten
+static uint32_t autoPhaseStart = 0;
+static uint16_t autoStartL = 0, autoStartR = 0;
+static uint16_t autoTargetL = 0, autoTargetR = 0;
+
+// ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     const uint32_t duty = (uint32_t)pulseUs * SERVO_DUTY_FS / SERVO_PERIOD_US;
     if (!ledcWrite(pin, duty)) {
@@ -88,6 +103,90 @@ void setServoDirect(uint16_t pulseL, uint16_t pulseR) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-Modus (nicht-blockierend, wird in loop() aufgerufen).
+// ---------------------------------------------------------------------------
+
+// IK-Pulsbreiten fuer eine Position berechnen. false, wenn unerreichbar.
+bool ikPulses(float x, float y, uint16_t& pulseL, uint16_t& pulseR) {
+    float thetaL = 0.0f, thetaR = 0.0f;
+    if (!Kinematics::calculateIK(x, y, thetaL, thetaR)) {
+        return false;
+    }
+    pulseL = servos.angleToPulseUsLeft(thetaL);
+    pulseR = servos.angleToPulseUsRight(thetaR);
+    return true;
+}
+
+// Ziel-Pulsbreiten fuer einen Auto-Schritt bestimmen.
+bool autoTargetPulses(int step, uint16_t& pulseL, uint16_t& pulseR) {
+    switch (step) {
+        case 0:  // links
+            return ikPulses(POS_LEFT_X, POS_LEFT_Y, pulseL, pulseR);
+        case 1:  // oben (beide Kurbeln senkrecht)
+            pulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
+            pulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
+            return true;
+        case 2:  // rechts
+            return ikPulses(POS_RIGHT_X, POS_RIGHT_Y, pulseL, pulseR);
+        case 3:  // versteckt
+            pulseL = HIDE_PULSE_L;
+            pulseR = HIDE_PULSE_R;
+            return true;
+        default:
+            return false;
+    }
+}
+
+void startAutoMode() {
+    autoActive = true;
+    autoStep = 0;
+    if (!autoTargetPulses(autoStep, autoTargetL, autoTargetR)) {
+        autoTargetL = HIDE_PULSE_L;
+        autoTargetR = HIDE_PULSE_R;
+    }
+    autoStartL = lastPulseL;
+    autoStartR = lastPulseR;
+    autoMoving = true;
+    autoPhaseStart = millis();
+}
+
+void updateAutoMode() {
+    const uint32_t now = millis();
+    const uint32_t elapsed = now - autoPhaseStart;
+
+    if (autoMoving) {
+        // Linearer Uebergang start -> target (1 s)
+        float t = (float)elapsed / (float)AUTO_MOVE_MS;
+        if (t > 1.0f) t = 1.0f;
+        uint16_t l = (uint16_t)((float)autoStartL + ((float)autoTargetL - (float)autoStartL) * t);
+        uint16_t r = (uint16_t)((float)autoStartR + ((float)autoTargetR - (float)autoStartR) * t);
+        servoWriteUs(PIN_SERVO_LEFT,  l);
+        servoWriteUs(PIN_SERVO_RIGHT, r);
+        lastPulseL = l;
+        lastPulseR = r;
+        lastIkValid = true;
+
+        if (elapsed >= AUTO_MOVE_MS) {
+            autoMoving = false;
+            autoPhaseStart = now;
+        }
+    } else {
+        // Halten (2 s)
+        if (elapsed >= AUTO_HOLD_MS) {
+            autoStep = (autoStep + 1) % AUTO_STEP_COUNT;
+            if (!autoTargetPulses(autoStep, autoTargetL, autoTargetR)) {
+                autoTargetL = HIDE_PULSE_L;
+                autoTargetR = HIDE_PULSE_R;
+            }
+            autoStartL = lastPulseL;
+            autoStartR = lastPulseR;
+            autoMoving = true;
+            autoPhaseStart = now;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // BLE-Empfang: eine Zeile -> Befehl parsen und ausfuehren.
 // (Wird aus dem BLE-Kontext aufgerufen; fuer den Testbetrieb reicht das.)
 // ---------------------------------------------------------------------------
@@ -100,6 +199,7 @@ void handleLine(const char* line) {
 
     switch (cmd.type) {
         case Command::Type::MOVE:
+            autoActive = false;
             directMode = false;
             planner.moveTo(cmd.x, cmd.y,
                            cmd.snap ? MotionPlanner::MoveType::SNAP
@@ -108,6 +208,7 @@ void handleLine(const char* line) {
             break;
 
         case Command::Type::PEEK:
+            autoActive = false;
             directMode = false;
             switch (cmd.peek) {
                 case Command::Peek::LEFT:
@@ -131,12 +232,19 @@ void handleLine(const char* line) {
             break;
 
         case Command::Type::STOP:
+            autoActive = false;
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+            ble.sendLine("OK");
+            break;
+
+        case Command::Type::AUTO:
+            startAutoMode();
             ble.sendLine("OK");
             break;
 
         case Command::Type::RAW:
             // Direkter Servo-Test: IK/Planner umgehen, Pulsbreiten direkt setzen.
+            autoActive = false;
             setServoDirect(cmd.rawL, cmd.rawR);
             ble.sendLine("OK");
             break;
@@ -194,9 +302,13 @@ void loop() {
     const float dt = (now - prev) / 1000.0f;
     prev = now;
 
-    planner.update(dt);
-    if (!directMode) {
-        moveToPosition(planner.x(), planner.y());
+    if (autoActive) {
+        updateAutoMode();
+    } else {
+        planner.update(dt);
+        if (!directMode) {
+            moveToPosition(planner.x(), planner.y());
+        }
     }
 
     // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen

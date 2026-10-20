@@ -83,6 +83,14 @@ void test_raw_clamp(void) {
     TEST_ASSERT_EQUAL_UINT16(2500, c.rawR);   // 3000 -> 2500 geklemmt
 }
 
+void test_auto(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("AUTO", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::AUTO);
+    TEST_ASSERT_TRUE(CommandParser::parse("auto", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::AUTO);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -94,5 +102,6 @@ int main(void) {
     RUN_TEST(test_invalid);
     RUN_TEST(test_raw);
     RUN_TEST(test_raw_clamp);
+    RUN_TEST(test_auto);
     return UNITY_END();
 }

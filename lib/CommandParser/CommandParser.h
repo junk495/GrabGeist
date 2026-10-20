@@ -8,7 +8,7 @@
 
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO };
     enum class Peek { LEFT, RIGHT, TOP, HIDE };
 
     Type type = Type::NONE;

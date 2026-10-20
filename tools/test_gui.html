@@ -34,13 +34,20 @@
 
 <hr>
 <div>
-  <!-- Links/Rechts/Versteckt sind IK-Presets. "Beide oben" ist die Montage-Referenz
-       (beide Kurbeln senkrecht nach oben, theta = 90°). -->
+  <!-- Links/Rechts sind IK-Presets. "Beide oben" ist die Montage-Referenz
+       (beide Kurbeln senkrecht nach oben, theta = 90°). "Versteckt" ist eine
+       direkte Servo-Position. -->
   <button data-cmd="PEEK left"  data-x="-50" data-y="150">Links</button>
   <button data-cmd="PEEK right" data-x="50"  data-y="150">Rechts</button>
   <button data-cmd="PEEK top">Beide oben</button>
-  <button data-cmd="PEEK hide"  data-x="0"   data-y="170">Versteckt</button>
+  <button data-cmd="PEEK hide">Versteckt</button>
   <button id="stop">STOP</button>
+</div>
+
+<hr>
+<div>
+  <button id="auto">AUTO (Ablauf)</button>
+  <span style="color:#666">links → oben → rechts → versteckt · 1 s Wechsel / 2 s Halten</span>
 </div>
 
 <hr>
@@ -111,6 +118,7 @@ document.getElementById('connect').onclick = connect;
 document.getElementById('send').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value}`);
 document.getElementById('snap').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value} snap`);
 document.getElementById('stop').onclick = () => { setSliders(0, 170); send('STOP'); };
+document.getElementById('auto').onclick = () => send('AUTO');
 document.querySelectorAll('button[data-cmd]').forEach(b => {
   b.onclick = () => {
     if (b.dataset.x !== undefined && b.dataset.y !== undefined) {

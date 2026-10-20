@@ -102,5 +102,10 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "AUTO")) {
+        out.type = Command::Type::AUTO;
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }
