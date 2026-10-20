@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HostageTarget Test</title>
+<style>
+  body { font-family: sans-serif; margin: 16px; }
+  button { font-size: 18px; padding: 12px 16px; margin: 4px; min-width: 90px; }
+  .row { margin: 16px 0; }
+  input[type=range] { width: 70%; vertical-align: middle; }
+  #status { font-family: monospace; color: #333; margin-left: 8px; }
+  hr { margin: 20px 0; }
+</style>
+</head>
+<body>
+<h1>HostageTarget &mdash; Test</h1>
+
+<button id="connect">Verbinden</button>
+<span id="status">nicht verbunden</span>
+
+<div class="row">
+  <label>X (mm): <input type="range" id="x" min="-100" max="100" value="0" step="1"></label>
+  <span id="xval">0</span>
+</div>
+<div class="row">
+  <label>Y (mm): <input type="range" id="y" min="20" max="200" value="170" step="1"></label>
+  <span id="yval">170</span>
+</div>
+<div class="row">
+  <button id="send">MOVE (weich)</button>
+  <button id="snap">MOVE (Sprung)</button>
+</div>
+
+<hr>
+<div>
+  <button data-cmd="PEEK left">Links</button>
+  <button data-cmd="PEEK right">Rechts</button>
+  <button data-cmd="PEEK top">Oben</button>
+  <button data-cmd="PEEK hide">Versteckt</button>
+  <button id="stop">STOP</button>
+</div>
+
+<script>
+const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const RX_UUID      = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // schreiben (Handy -> ESP)
+const TX_UUID      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // empfangen (ESP -> Handy)
+
+let rxChar = null;
+let txChar = null;
+
+const status = document.getElementById('status');
+const xSlider = document.getElementById('x');
+const ySlider = document.getElementById('y');
+
+xSlider.oninput = () => document.getElementById('xval').textContent = xSlider.value;
+ySlider.oninput = () => document.getElementById('yval').textContent = ySlider.value;
+
+function send(line) {
+  if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
+  rxChar.writeValue(new TextEncoder().encode(line + '\n'));
+}
+
+async function connect() {
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }]
+    });
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    rxChar = await service.getCharacteristic(RX_UUID);
+    txChar = await service.getCharacteristic(TX_UUID);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', (e) => {
+      const text = new TextDecoder().decode(e.target.value);
+      status.textContent = 'RX: ' + text.trim();
+    });
+    status.textContent = 'verbunden';
+  } catch (err) {
+    status.textContent = 'Fehler: ' + err;
+  }
+}
+
+document.getElementById('connect').onclick = connect;
+document.getElementById('send').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value}`);
+document.getElementById('snap').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value} snap`);
+document.getElementById('stop').onclick = () => send('STOP');
+document.querySelectorAll('button[data-cmd]').forEach(b => {
+  b.onclick = () => send(b.dataset.cmd);
+});
+</script>
+</body>
+</html>

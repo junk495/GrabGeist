@@ -10,8 +10,8 @@
 - Einheiten: Längen in **mm**, Winkel intern in **Radiant** (Grad erst bei der PWM-Umrechnung).
 
 ## Code-Struktur
-- Wiederverwendbare Klassen in `lib/` (werden von den Tests mitgebaut).
-- Arduino-Sketch nur in `src/main.cpp`.
+- Wiederverwendbare/testbare Klassen in `lib/` (werden von den Tests mitgebaut).
+- ESP32-spezifischer Code (Sketch `main.cpp`, BLE, LEDC) in `src/`.
 - Neue Logik immer mit Unit-Test in `test/` (Unity, nativ) absichern.
 
 ## Qualität

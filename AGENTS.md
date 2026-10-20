@@ -23,10 +23,17 @@ Mechanik: symmetrisches, ebenes 2-DOF-5-Gelenk-Parallelgetriebe (Fünfgelenkgetr
 Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr float`) geführt — nicht verstreut hartkodieren.
 
 ## Verzeichnisstruktur
-- `src/main.cpp` — Arduino-Sketch (Einstieg, `setup()`/`loop()`)
-- `lib/<Name>/` — wiederverwendbare Klassen (werden auch von den Tests mitgebaut)
+- `src/main.cpp` — Arduino-Sketch (Einstieg, `setup()`/`loop()`, 50-Hz-Loop)
+- `src/BleUart.{h,cpp}` — BLE-UART (Nordic-UART-Service) für die Handy-Teststeuerung (ESP32-spezifisch)
+- `lib/Kinematics/` — inverse Kinematik (pur, hardwarefrei)
+- `lib/ServoController/` — Kurbelwinkel → PWM-Pulsbreite
+- `lib/MotionPlanner/` — nicht-blockierende Bahnplanung (Sprung/Sweep)
+- `lib/CommandParser/` — Textbefehle → strukturierter `Command`
 - `test/` — native Unit-Tests (Unity)
-- `SystemSpecification.md` — Spezifikation
+- `tools/test_gui.html` — Handy-Testoberfläche (Web Bluetooth)
+- `SystemSpecification.md` — Spezifikation (autoritativ)
+- `kinematik_konzept.md` — IK-Briefing (Maße, Formeln, Beispiel)
+- `steuerung_konzept.md` — Steuerungskonzept (Tasten/BLE/Joystick/Web)
 - `platformio.ini` — Build-/Test-Konfiguration
 
 ## Kommandos
@@ -36,5 +43,6 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 
 ## Konventionen
 - Winkel intern in **Radiant**; Umrechnung auf Grad/PWM erst im `ServoController`.
-- Klassentrennung: `Kinematics` (pur, hardwarefrei) → `ServoController` → `MotionPlanner`.
+- Datenfluss: `BleUart`/Eingabe → `CommandParser` → `MotionPlanner` → `Kinematics` → `ServoController` → LEDC.
+- Wiederverwendbare/testbare Logik in `lib/`; ESP32-spezifischer Code (BLE, LEDC) in `src/`.
 - IK-Solver `calculateIK(x, y, &thetaL, &thetaR)` muss ungültige Koordinaten mit `false` ablehnen (siehe Spec §4).
