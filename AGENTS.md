@@ -18,7 +18,7 @@ Mechanik: symmetrisches, ebenes 2-DOF-5-Gelenk-Parallelgetriebe (Fünfgelenkgetr
 |-----------|------|-----------|
 | `D`  | 65  | Abstand der beiden Servoachsen |
 | `L1` | 90  | Kurbellänge (Kurbelarm) |
-| `L2` | 120 | Schubstangenlänge |
+| `L2` | 125 | Schubstangenlänge |
 
 Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr float`) geführt — nicht verstreut hartkodieren.
 

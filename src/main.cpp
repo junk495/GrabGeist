@@ -34,10 +34,14 @@ static const uint32_t LOOP_INTERVAL_MS = 20;   // 50 Hz
 // ---------------------------------------------------------------------------
 // Preset-Koordinaten (ANPASSEN, sobald die Mechanik aus Fusion steht!)
 // ---------------------------------------------------------------------------
-static const float POS_HIDE_X  = 0.0f,  POS_HIDE_Y  = 170.0f;
 static const float POS_LEFT_X  = -50.0f, POS_LEFT_Y  = 150.0f;
 static const float POS_RIGHT_X = 50.0f,  POS_RIGHT_Y = 150.0f;
-static const float POS_TOP_X   = 0.0f,  POS_TOP_Y   = 190.0f;
+
+// "Versteckt" als direkte Servo-Position (am Aufbau ermittelt).
+// Kein IK-Punkt: die Kurbeln stehen dabei weit auseinander (Schubstangen
+// treffen sich nicht) -> Ziel liegt tief hinter dem Pfosten.
+static const uint16_t HIDE_PULSE_L = 1660;
+static const uint16_t HIDE_PULSE_R = 1350;
 
 // Software-Bausteine
 static MotionPlanner   planner;
@@ -69,6 +73,18 @@ void moveToPosition(float x, float y) {
     } else {
         lastIkValid = false;   // ungueltige Position -> Servos halten letzte Stellung
     }
+}
+
+// ---------------------------------------------------------------------------
+// Servos direkt auf feste Pulsbreiten setzen (umgeht IK/Planner).
+// ---------------------------------------------------------------------------
+void setServoDirect(uint16_t pulseL, uint16_t pulseR) {
+    directMode = true;
+    lastPulseL = pulseL;
+    lastPulseR = pulseR;
+    lastIkValid = true;
+    servoWriteUs(PIN_SERVO_LEFT,  pulseL);
+    servoWriteUs(PIN_SERVO_RIGHT, pulseR);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,34 +120,24 @@ void handleLine(const char* line) {
                     // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
                     // Montage-Referenz; umgeht die IK, da das exakte "beide oben"
                     // knapp ausserhalb der IK-Reichweite liegt.
-                    directMode = true;
-                    lastPulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
-                    lastPulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
-                    lastIkValid = true;
-                    servoWriteUs(PIN_SERVO_LEFT,  lastPulseL);
-                    servoWriteUs(PIN_SERVO_RIGHT, lastPulseR);
+                    setServoDirect(servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f)),
+                                   servos.angleToPulseUsRight(Kinematics::degToRad(90.0f)));
                     break;
                 case Command::Peek::HIDE:
-                    planner.moveTo(POS_HIDE_X, POS_HIDE_Y, MotionPlanner::MoveType::SNAP);
+                    setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
                     break;
             }
             ble.sendLine("OK");
             break;
 
         case Command::Type::STOP:
-            directMode = false;
-            planner.moveTo(POS_HIDE_X, POS_HIDE_Y, MotionPlanner::MoveType::SNAP);
+            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
             ble.sendLine("OK");
             break;
 
         case Command::Type::RAW:
             // Direkter Servo-Test: IK/Planner umgehen, Pulsbreiten direkt setzen.
-            directMode = true;
-            lastPulseL = cmd.rawL;
-            lastPulseR = cmd.rawR;
-            lastIkValid = true;
-            servoWriteUs(PIN_SERVO_LEFT,  cmd.rawL);
-            servoWriteUs(PIN_SERVO_RIGHT, cmd.rawR);
+            setServoDirect(cmd.rawL, cmd.rawR);
             ble.sendLine("OK");
             break;
 
@@ -167,9 +173,9 @@ void setup() {
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
     Serial.printf("LEDC attach: L=%d R=%d\n", ledcL, ledcR);
 
-    // Startposition: versteckt
-    planner.setPosition(POS_HIDE_X, POS_HIDE_Y);
-    moveToPosition(planner.x(), planner.y());
+    // Startposition: versteckt (direkte Servo-Position)
+    planner.setPosition(0.0f, 170.0f);   // Planner-Referenz fuer nachfolgende IK-Bewegungen
+    setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
 
     // BLE starten
     ble.setLineCallback(handleLine);

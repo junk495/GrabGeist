@@ -8,7 +8,7 @@ Die Software berechnet daraus die benötigten Servowinkel (Inverse Kinematik, IK
 ## Mechanischer Aufbau
 - 2 Servos an der Basis, Achsabstand **D = 65 mm**.
 - Jeder Servo treibt eine **Kurbel** (Länge **L1 = 90 mm**) an.
-- An jeder Kurbel hängt eine **Schubstange** (Länge **L2 = 120 mm**).
+- An jeder Kurbel hängt eine **Schubstange** (Länge **L2 = 125 mm**).
 - Beide Schubstangen treffen sich im **zentralen Gelenk P(X, Y)** (End-Effektor).
 - Am selben Punkt P ist eine **Querstange** drehbar gelagert (über 2 Gummibänder senkrecht zur
   Winkelhalbierenden der Schubstangen gehalten); darauf steht **nach oben** das Pappziel.
@@ -51,8 +51,8 @@ Der IK-Solver (`bool calculateIK(x, y, &thetaL, &thetaR)`) muss ungültige Koord
 - Ziel-Zentrallinie (senkrecht auf Querstange → entlang φ):  **ψ = φ**
   (Bei X = 0 steht das Ziel senkrecht; wandert P seitlich, kippt es in die Peek-Richtung.)
 
-## Plausibilitäts-Beispiel (D = 65, L1 = 90, L2 = 120)
-Ziel P(0, 170) mm → d ≈ 173.1 mm ,  θ_L ≈ 119.8° ,  θ_R ≈ 60.2°  (in rad: ≈ 2.090 / 1.051).
+## Plausibilitäts-Beispiel (D = 65, L1 = 90, L2 = 125)
+Ziel P(0, 170) mm → d ≈ 173.1 mm ,  θ_L ≈ 123.1° ,  θ_R ≈ 56.9°  (in rad: ≈ 2.149 / 0.993).
 Beide Winkel liegen innerhalb der Reichweite → gültig.
 
 ## Software-Bausteine

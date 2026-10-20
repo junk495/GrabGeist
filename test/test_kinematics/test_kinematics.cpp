@@ -7,12 +7,12 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-// Zentrum P(0, 170): thetaL ~ 119.8 Grad, thetaR ~ 60.2 Grad
+// Zentrum P(0, 170): thetaL ~ 123.1 Grad, thetaR ~ 56.9 Grad (L2 = 125 mm)
 void test_ik_center(void) {
     float thetaL = 0.0f, thetaR = 0.0f;
     TEST_ASSERT_TRUE(Kinematics::calculateIK(0.0f, 170.0f, thetaL, thetaR));
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 2.0905f, thetaL);
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 1.0511f, thetaR);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 2.1487f, thetaL);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.9929f, thetaR);
 }
 
 // Zu weit ausserhalb der Reichweite (d > L1 + L2)

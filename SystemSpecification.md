@@ -26,7 +26,7 @@ Der Nutzer bzw. das System gibt die gewünschten kartesischen Koordinaten $(X, Y
                             /      \
                            /        \
         Schubstange L2,L  /          \   Schubstange L2,R
-                (120 mm)  /            \        (120 mm)
+                (125 mm)  /            \        (125 mm)
                          /              \
                       E_L                E_R   <- Ellbogen (Kurbelenden)
                        |                  |
@@ -48,7 +48,7 @@ Der Nutzer bzw. das System gibt die gewünschten kartesischen Koordinaten $(X, Y
 - **Kinematische Konstanten (im Code als zentral anpassbare Variablen / `constexpr float`, Einheit mm):**
   - `D = 65.0f`: Abstand zwischen linkem und rechtem Servo.
   - `L1 = 90.0f`: Kurbellänge (Kurbelarm, am Servohorn befestigt) [ggf. nach CAD anpassen].
-  - `L2 = 120.0f`: Schubstangenlänge (von der Kurbel zum zentralen Gelenk) [ggf. nach CAD anpassen].
+  - `L2 = 125.0f`: Schubstangenlänge (von der Kurbel zum zentralen Gelenk) [ggf. nach CAD anpassen].
 - **Servopositionen:**
   - Linker Servo $S_L = (-D/2, 0) = (-32.5, 0)$
   - Rechter Servo $S_R = (+D/2, 0) = (+32.5, 0)$

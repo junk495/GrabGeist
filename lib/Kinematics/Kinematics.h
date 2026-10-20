@@ -14,7 +14,7 @@ public:
     // ------------------------------------------------------------------
     static constexpr float D       = 65.0f;   // Abstand der beiden Servoachsen
     static constexpr float L1      = 90.0f;   // Kurbellaenge (Kurbelarm)
-    static constexpr float L2      = 120.0f;  // Schubstangenlaenge
+    static constexpr float L2      = 125.0f;  // Schubstangenlaenge
     static constexpr float EPSILON = 5.0f;    // Sicherheitsabstand (mm)
 
     static constexpr float kPi = 3.14159265358979323846f;
