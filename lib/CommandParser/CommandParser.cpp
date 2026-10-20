@@ -83,5 +83,24 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "RAW")) {
+        char* ls = std::strtok(nullptr, " \t\r\n");
+        char* rs = std::strtok(nullptr, " \t\r\n");
+        if (ls == nullptr || rs == nullptr) {
+            return false;   // braucht linken und rechten Puls
+        }
+        long l = std::strtol(ls, nullptr, 10);
+        long r = std::strtol(rs, nullptr, 10);
+        // Auf den Servo-Bereich klemmen
+        if (l < 500)  l = 500;
+        if (l > 2500) l = 2500;
+        if (r < 500)  r = 500;
+        if (r > 2500) r = 2500;
+        out.type = Command::Type::RAW;
+        out.rawL = static_cast<uint16_t>(l);
+        out.rawR = static_cast<uint16_t>(r);
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }

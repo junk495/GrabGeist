@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW };
     enum class Peek { LEFT, RIGHT, TOP, HIDE };
 
     Type type = Type::NONE;
@@ -14,6 +16,8 @@ struct Command {
     float y = 0.0f;            // MOVE: Ziel Y [mm]
     bool  snap = false;        // MOVE: true = Sprung, false = weiche Bewegung
     Peek  peek = Peek::HIDE;   // PEEK: Ziel-Preset
+    uint16_t rawL = 1500;      // RAW: linker Servo-Puls [us]
+    uint16_t rawR = 1500;      // RAW: rechter Servo-Puls [us]
 };
 
 class CommandParser {

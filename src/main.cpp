@@ -48,11 +48,14 @@ static BleUart         ble;
 static uint16_t lastPulseL = 0;
 static uint16_t lastPulseR = 0;
 static bool     lastIkValid = false;
+static bool     directMode = false;   // true = Servos direkt ansteuern (RAW), IK/Planner pausiert
 
 // ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     const uint32_t duty = (uint32_t)pulseUs * SERVO_DUTY_FS / SERVO_PERIOD_US;
-    ledcWrite(pin, duty);
+    if (!ledcWrite(pin, duty)) {
+        Serial.printf("ledcWrite fehlgeschlagen (pin=%u duty=%u)\n", pin, (unsigned)duty);
+    }
 }
 
 void moveToPosition(float x, float y) {
@@ -81,6 +84,7 @@ void handleLine(const char* line) {
 
     switch (cmd.type) {
         case Command::Type::MOVE:
+            directMode = false;
             planner.moveTo(cmd.x, cmd.y,
                            cmd.snap ? MotionPlanner::MoveType::SNAP
                                     : MotionPlanner::MoveType::SMOOTH);
@@ -88,6 +92,7 @@ void handleLine(const char* line) {
             break;
 
         case Command::Type::PEEK:
+            directMode = false;
             switch (cmd.peek) {
                 case Command::Peek::LEFT:
                     planner.moveTo(POS_LEFT_X, POS_LEFT_Y, MotionPlanner::MoveType::SMOOTH);
@@ -106,7 +111,19 @@ void handleLine(const char* line) {
             break;
 
         case Command::Type::STOP:
+            directMode = false;
             planner.moveTo(POS_HIDE_X, POS_HIDE_Y, MotionPlanner::MoveType::SNAP);
+            ble.sendLine("OK");
+            break;
+
+        case Command::Type::RAW:
+            // Direkter Servo-Test: IK/Planner umgehen, Pulsbreiten direkt setzen.
+            directMode = true;
+            lastPulseL = cmd.rawL;
+            lastPulseR = cmd.rawR;
+            lastIkValid = true;
+            servoWriteUs(PIN_SERVO_LEFT,  cmd.rawL);
+            servoWriteUs(PIN_SERVO_RIGHT, cmd.rawR);
             ble.sendLine("OK");
             break;
 
@@ -132,8 +149,9 @@ void setup() {
     // servos.setCalibrationLeft(Kinematics::degToRad(0.0f),  false);
     // servos.setCalibrationRight(Kinematics::degToRad(0.0f), true);
 
-    ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
-    ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
+    const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
+    const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
+    Serial.printf("LEDC attach: L=%d R=%d\n", ledcL, ledcR);
 
     // Startposition: versteckt
     planner.setPosition(POS_HIDE_X, POS_HIDE_Y);
@@ -157,7 +175,9 @@ void loop() {
     prev = now;
 
     planner.update(dt);
-    moveToPosition(planner.x(), planner.y());
+    if (!directMode) {
+        moveToPosition(planner.x(), planner.y());
+    }
 
     // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen
     // PWM-Pulsbreiten anzeigen (nicht in jedem 20-ms-Zyklus, damit der Monitor
@@ -167,8 +187,9 @@ void loop() {
         lastLog = now;
         char buf[96];
         if (lastIkValid) {
-            snprintf(buf, sizeof(buf), "PWM L=%uus R=%uus  pos=(%.1f, %.1f)",
+            snprintf(buf, sizeof(buf), "PWM L=%uus R=%uus  readL=%u readR=%u  pos=(%.1f, %.1f)",
                      (unsigned)lastPulseL, (unsigned)lastPulseR,
+                     (unsigned)ledcRead(PIN_SERVO_LEFT), (unsigned)ledcRead(PIN_SERVO_RIGHT),
                      planner.x(), planner.y());
         } else {
             snprintf(buf, sizeof(buf), "IK ungueltig  pos=(%.1f, %.1f)",

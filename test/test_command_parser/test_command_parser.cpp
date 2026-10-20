@@ -64,6 +64,23 @@ void test_invalid(void) {
     TEST_ASSERT_FALSE(CommandParser::parse("MOVE 10", c));        // y fehlt
     TEST_ASSERT_FALSE(CommandParser::parse("PEEK", c));           // Ziel fehlt
     TEST_ASSERT_FALSE(CommandParser::parse("PEEK banana", c));    // unbekanntes Ziel
+    TEST_ASSERT_FALSE(CommandParser::parse("RAW 1500", c));       // rechter Puls fehlt
+}
+
+void test_raw(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("RAW 500 2500", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::RAW);
+    TEST_ASSERT_EQUAL_UINT16(500, c.rawL);
+    TEST_ASSERT_EQUAL_UINT16(2500, c.rawR);
+}
+
+void test_raw_clamp(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("raw 100 3000", c));    // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::RAW);
+    TEST_ASSERT_EQUAL_UINT16(500, c.rawL);    // 100 -> 500 geklemmt
+    TEST_ASSERT_EQUAL_UINT16(2500, c.rawR);   // 3000 -> 2500 geklemmt
 }
 
 int main(void) {
@@ -75,5 +92,7 @@ int main(void) {
     RUN_TEST(test_peek_all_targets);
     RUN_TEST(test_stop_status);
     RUN_TEST(test_invalid);
+    RUN_TEST(test_raw);
+    RUN_TEST(test_raw_clamp);
     return UNITY_END();
 }
