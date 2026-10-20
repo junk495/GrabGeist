@@ -101,7 +101,15 @@ void handleLine(const char* line) {
                     planner.moveTo(POS_RIGHT_X, POS_RIGHT_Y, MotionPlanner::MoveType::SMOOTH);
                     break;
                 case Command::Peek::TOP:
-                    planner.moveTo(POS_TOP_X, POS_TOP_Y, MotionPlanner::MoveType::SMOOTH);
+                    // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
+                    // Montage-Referenz; umgeht die IK, da das exakte "beide oben"
+                    // knapp ausserhalb der IK-Reichweite liegt.
+                    directMode = true;
+                    lastPulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
+                    lastPulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
+                    lastIkValid = true;
+                    servoWriteUs(PIN_SERVO_LEFT,  lastPulseL);
+                    servoWriteUs(PIN_SERVO_RIGHT, lastPulseR);
                     break;
                 case Command::Peek::HIDE:
                     planner.moveTo(POS_HIDE_X, POS_HIDE_Y, MotionPlanner::MoveType::SNAP);
