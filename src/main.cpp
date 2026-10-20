@@ -145,9 +145,11 @@ void handleLine(const char* line) {
 void setup() {
     Serial.begin(115200);
 
-    // Servo-Kalibrierung (ANPASSEN!)
-    // servos.setCalibrationLeft(Kinematics::degToRad(0.0f),  false);
-    // servos.setCalibrationRight(Kinematics::degToRad(0.0f), true);
+    // Servo-Kalibrierung (am Aufbau ermittelt):
+    // Kurbel senkrecht nach oben (theta = 90°) bei: links 2140 us, rechts 2130 us.
+    // Beide Servos drehen in dieselbe Richtung -> keine Invertierung.
+    servos.setCalibrationLeft(Kinematics::degToRad(3.60f),  false);
+    servos.setCalibrationRight(Kinematics::degToRad(4.95f), false);
 
     const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
