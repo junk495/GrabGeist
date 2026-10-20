@@ -34,10 +34,11 @@
 
 <hr>
 <div>
-  <button data-cmd="PEEK left">Links</button>
-  <button data-cmd="PEEK right">Rechts</button>
-  <button data-cmd="PEEK top">Oben</button>
-  <button data-cmd="PEEK hide">Versteckt</button>
+  <!-- Preset-Koordinaten muessen mit main.cpp (POS_LEFT/RIGHT/TOP/HIDE) uebereinstimmen. -->
+  <button data-cmd="PEEK left"  data-x="-50" data-y="150">Links</button>
+  <button data-cmd="PEEK right" data-x="50"  data-y="150">Rechts</button>
+  <button data-cmd="PEEK top"   data-x="0"   data-y="190">Oben</button>
+  <button data-cmd="PEEK hide"  data-x="0"   data-y="170">Versteckt</button>
   <button id="stop">STOP</button>
 </div>
 
@@ -81,12 +82,24 @@ async function connect() {
   }
 }
 
+function setSliders(x, y) {
+  xSlider.value = x;
+  ySlider.value = y;
+  document.getElementById('xval').textContent = x;
+  document.getElementById('yval').textContent = y;
+}
+
 document.getElementById('connect').onclick = connect;
 document.getElementById('send').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value}`);
 document.getElementById('snap').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value} snap`);
-document.getElementById('stop').onclick = () => send('STOP');
+document.getElementById('stop').onclick = () => { setSliders(0, 170); send('STOP'); };
 document.querySelectorAll('button[data-cmd]').forEach(b => {
-  b.onclick = () => send(b.dataset.cmd);
+  b.onclick = () => {
+    if (b.dataset.x !== undefined && b.dataset.y !== undefined) {
+      setSliders(b.dataset.x, b.dataset.y);
+    }
+    send(b.dataset.cmd);
+  };
 });
 </script>
 </body>

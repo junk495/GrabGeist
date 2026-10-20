@@ -44,6 +44,11 @@ static MotionPlanner   planner;
 static ServoController servos;
 static BleUart         ble;
 
+// Zuletzt an die Servo-Pins ausgegebene PWM-Pulsbreiten (fuer die Monitor-Ausgabe).
+static uint16_t lastPulseL = 0;
+static uint16_t lastPulseR = 0;
+static bool     lastIkValid = false;
+
 // ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     const uint32_t duty = (uint32_t)pulseUs * SERVO_DUTY_FS / SERVO_PERIOD_US;
@@ -53,10 +58,14 @@ void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
 void moveToPosition(float x, float y) {
     float thetaL = 0.0f, thetaR = 0.0f;
     if (Kinematics::calculateIK(x, y, thetaL, thetaR)) {
-        servoWriteUs(PIN_SERVO_LEFT,  servos.angleToPulseUsLeft(thetaL));
-        servoWriteUs(PIN_SERVO_RIGHT, servos.angleToPulseUsRight(thetaR));
+        lastPulseL = servos.angleToPulseUsLeft(thetaL);
+        lastPulseR = servos.angleToPulseUsRight(thetaR);
+        lastIkValid = true;
+        servoWriteUs(PIN_SERVO_LEFT,  lastPulseL);
+        servoWriteUs(PIN_SERVO_RIGHT, lastPulseR);
+    } else {
+        lastIkValid = false;   // ungueltige Position -> Servos halten letzte Stellung
     }
-    // ungueltige Position -> Servos halten die letzte Stellung
 }
 
 // ---------------------------------------------------------------------------
@@ -149,4 +158,22 @@ void loop() {
 
     planner.update(dt);
     moveToPosition(planner.x(), planner.y());
+
+    // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen
+    // PWM-Pulsbreiten anzeigen (nicht in jedem 20-ms-Zyklus, damit der Monitor
+    // nicht ueberlaeuft).
+    static uint32_t lastLog = 0;
+    if (now - lastLog >= 1000) {
+        lastLog = now;
+        char buf[96];
+        if (lastIkValid) {
+            snprintf(buf, sizeof(buf), "PWM L=%uus R=%uus  pos=(%.1f, %.1f)",
+                     (unsigned)lastPulseL, (unsigned)lastPulseR,
+                     planner.x(), planner.y());
+        } else {
+            snprintf(buf, sizeof(buf), "IK ungueltig  pos=(%.1f, %.1f)",
+                     planner.x(), planner.y());
+        }
+        Serial.println(buf);
+    }
 }
