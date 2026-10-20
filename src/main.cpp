@@ -25,13 +25,14 @@ static const uint8_t PIN_SERVO_LEFT  = 4;   // linker Servo  (PWM)
 static const uint8_t PIN_SERVO_RIGHT = 5;   // rechter Servo (PWM)
 
 // ---------------------------------------------------------------------------
-// PWM (LEDC) fuer 270-Grad-RC-Servos: 50 Hz, 16 Bit.
-// Pulsbreite 500..2500 us wird auf Duty 0..2^16 abgebildet.
+// PWM (LEDC) fuer 270-Grad-RC-Servos: 50 Hz, 14 Bit.
+// Hinweis: ESP32-S3-LEDC erlaubt maximal 14 Bit Aufloesung.
+// Pulsbreite 500..2500 us wird auf Duty 0..2^14 abgebildet.
 // ---------------------------------------------------------------------------
 static const uint32_t SERVO_FREQ_HZ   = 50;
-static const uint8_t  SERVO_RES_BITS  = 16;
+static const uint8_t  SERVO_RES_BITS  = 14;
 static const uint32_t SERVO_PERIOD_US = 1000000u / SERVO_FREQ_HZ;   // 20000 us
-static const uint32_t SERVO_DUTY_FS   = (1u << SERVO_RES_BITS);     // 2^16 = 65536
+static const uint32_t SERVO_DUTY_FS   = (1u << SERVO_RES_BITS);     // 2^14 = 16384
 
 // Update-Schleife
 static const uint32_t LOOP_INTERVAL_MS = 20;   // 50 Hz
