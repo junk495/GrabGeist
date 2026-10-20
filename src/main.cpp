@@ -146,10 +146,14 @@ void setup() {
     Serial.begin(115200);
 
     // Servo-Kalibrierung (am Aufbau ermittelt):
-    // Kurbel senkrecht nach oben (theta = 90°) bei: links 2140 us, rechts 2130 us.
-    // Beide Servos drehen in dieselbe Richtung -> keine Invertierung.
-    servos.setCalibrationLeft(Kinematics::degToRad(3.60f),  false);
-    servos.setCalibrationRight(Kinematics::degToRad(4.95f), false);
+    // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
+    //   links = 500 us, rechts = 2500 us.
+    // Kurbel senkrecht nach oben (theta = 90°):
+    //   links = 960 us, rechts = 2010 us.
+    // Daraus folgt: Servo-Mitte (1500 us) entspricht theta = +162.90° (links)
+    // bzw. theta = +21.15° (rechts). Keine Invertierung.
+    servos.setCalibrationLeft(Kinematics::degToRad(162.90f), false);
+    servos.setCalibrationRight(Kinematics::degToRad(21.15f), false);
 
     const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
