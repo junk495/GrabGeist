@@ -25,6 +25,11 @@ void BleUart::begin(const char* deviceName) {
         BLECharacteristic::PROPERTY_NOTIFY);
 
     service->start();
+
+    // Service-UUID mit ins Advertising aufnehmen. Ohne diesen Aufruf wird nur der
+    // Geraetename ausgestrahlt; Clients, die per Service-UUID filtern (z.B. Web
+    // Bluetooth in tools/test_gui.html), finden das Geraet dann nicht.
+    server->getAdvertising()->addServiceUUID(SERVICE_UUID);
     server->getAdvertising()->start();
 }
 
