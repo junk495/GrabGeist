@@ -29,6 +29,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - `lib/ServoController/` — Kurbelwinkel → PWM-Pulsbreite
 - `lib/MotionPlanner/` — nicht-blockierende Bahnplanung (Sprung/Sweep)
 - `lib/CommandParser/` — Textbefehle → strukturierter `Command`
+- `lib/Workspace/` — erreichbarer Arbeitsraum (Nierenform: Karte, Snap, A*-Pfad)
 - `test/` — native Unit-Tests (Unity)
 - `tools/test_gui.html` — Handy-Testoberfläche (Web Bluetooth)
 - `SystemSpecification.md` — Spezifikation (autoritativ)
@@ -43,6 +44,6 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 
 ## Konventionen
 - Winkel intern in **Radiant**; Umrechnung auf Grad/PWM erst im `ServoController`.
-- Datenfluss: `BleUart`/Eingabe → `CommandParser` → `MotionPlanner` → `Kinematics` → `ServoController` → LEDC.
+- Datenfluss: `BleUart`/Eingabe → `CommandParser` → `Workspace` → `MotionPlanner` → `Kinematics` → `ServoController` → LEDC.
 - Wiederverwendbare/testbare Logik in `lib/`; ESP32-spezifischer Code (BLE, LEDC) in `src/`.
-- IK-Solver `calculateIK(x, y, &thetaL, &thetaR)` muss ungültige Koordinaten mit `false` ablehnen (siehe Spec §4).
+- IK-Solver `calculateIK(x, y, &thetaL, &thetaR)` ist **bimodal** (Knie nach außen + Over-Center) und lehnt ungültige/kollidierende Koordinaten mit `false` ab (siehe Spec §4).

@@ -20,28 +20,31 @@ Die Software berechnet daraus die benötigten Servowinkel (Inverse Kinematik, IK
 - X: horizontal (rechts positiv).  Y: vertikal (oben positiv, von den Servos weg).
 - Servopositionen:  **S_L = (−D/2, 0)** ,  **S_R = (+D/2, 0)**.
 
-## Inverse Kinematik (Zielposition → Servowinkel)
+## Inverse Kinematik (Zielposition → Servowinkel) — bimodal
 Winkel werden **gegen den Uhrzeigersinn von der positiven X-Achse** gemessen; intern in **Radiant**.
 
-### Linker Arm (S_L → P)
-1. ΔX_L = X + D/2 ,  ΔY_L = Y
-2. d_L = √(ΔX_L² + ΔY_L²)
-3. α_L = atan2(ΔY_L, ΔX_L)
-4. β_L = acos( (L1² + d_L² − L2²) / (2 · L1 · d_L) )
-5. **θ_L = α_L + β_L**   ← Konfiguration „Knie nach außen" (Standard)
+Für jeden Arm gibt es **zwei** Lösungen (Kandidaten):
+- Linker Arm:   θ_L,1 = α_L + β_L  („Knie nach außen") ,  θ_L,2 = α_L − β_L  („Over-Center")
+- Rechter Arm:  θ_R,1 = α_R − β_R  („Knie nach außen") ,  θ_R,2 = α_R + β_R  („Over-Center")
 
-### Rechter Arm (S_R → P)
-1. ΔX_R = X − D/2 ,  ΔY_R = Y
-2. d_R = √(ΔX_R² + ΔY_R²)
-3. α_R = atan2(ΔY_R, ΔX_R)
-4. β_R = acos( (L1² + d_R² − L2²) / (2 · L1 · d_R) )
-5. **θ_R = α_R − β_R**   ← Konfiguration „Knie nach außen" (Standard)
+mit  d = √(ΔX² + ΔY²) ,  α = atan2(ΔY, ΔX) ,  β = acos( (L1² + d² − L2²) / (2 · L1 · d) ).
 
-## Gültigkeitsprüfung (MUSS vor jeder Bewegung erfolgen)
-Der IK-Solver (`bool calculateIK(x, y, &thetaL, &thetaR)`) muss ungültige Koordinaten mit `false` ablehnen:
-1. **Reichweite (Dreiecksungleichung):**  |L1 − L2| + ε < d < (L1 + L2) − ε ,  mit ε ≈ 5 mm
+Aus den 2×2 = **4 Kandidaten-Paaren** wird ein **kollisionsfreies** Paar gewählt:
+- Standard: „Knie nach außen" bevorzugt.
+- Mit Hysterese-Hint: das dem **aktuellen Servowinkel** nächste Paar (vermeidet Konfigurationssprünge).
+
+Die Over-Center-Lösung (>180° bzw. negativ) erschließt die **unteren seitlichen Taschen**
+(negatives Y) — dadurch entsteht der **nierenförmige** Arbeitsraum.
+
+## Gültigkeitsprüfung & Kollisionsfilter (MUSS vor jeder Bewegung erfolgen)
+Der IK-Solver (`bool calculateIK(...)`) muss ungültige/kollidierende Koordinaten mit `false` ablehnen:
+1. **Reichweite:**  |L1 − L2| + ε < d < (L1 + L2) − ε ,  mit ε ≈ 5 mm  (→ 40…210 mm)
 2. **acos-Domäne:** Argument vor `acos()` strikt auf [−1, 1] clampen.
-3. **Servo-Grenzen:** θ_L und θ_R innerhalb der physischen Stellgrenzen (270°-Servos) halten; Kollision vermeiden.
+3. **Servo-Grenzen:**  θ_L ∈ [27.9°, 297.9°] ,  θ_R ∈ [−113.85°, 156.15°]  (aus Kalibrierung, am Modell verifizieren!)
+4. **Zentrale Sperrzone (Servogehäuse):** P darf nicht in [−45, +45] × [−60, +20] liegen.
+5. **Link↔Achsen-Clearance:** Kurbeln/Schubstangen halten ≥ 18 mm Abstand zur gegenüberliegenden Servoachse.
+6. **Kein Kreuz/Verklemmen:** Kurbeln kreuzen sich nicht; Ellbogen-Abstand ≥ 30 mm; Stangen kreuzen keine Kurbel.
+7. **Gelenk-Orientierung:** P bleibt auf der positiven Seite von E_L→E_R (kein Umklappen des Ziels).
 
 ## Ziel-Ausrichtung (Kopf-Orientierung, optional)
 - Ellbogen:  E_L = (−D/2 + L1·cos θ_L, L1·sin θ_L) ,  E_R = (+D/2 + L1·cos θ_R, L1·sin θ_R)
@@ -52,13 +55,16 @@ Der IK-Solver (`bool calculateIK(x, y, &thetaL, &thetaR)`) muss ungültige Koord
   (Bei X = 0 steht das Ziel senkrecht; wandert P seitlich, kippt es in die Peek-Richtung.)
 
 ## Plausibilitäts-Beispiel (D = 65, L1 = 90, L2 = 125)
-Ziel P(0, 170) mm → d ≈ 173.1 mm ,  θ_L ≈ 123.1° ,  θ_R ≈ 56.9°  (in rad: ≈ 2.149 / 0.993).
-Beide Winkel liegen innerhalb der Reichweite → gültig.
+- Mitte:           P(0, 170)     → θ_L ≈ 123.1° , θ_R ≈ 56.9°   (Knie nach außen)
+- Linke Tasche:    P(−120, −40)  → θ_L ≈ 288.8° , θ_R ≈ 142.3°  (Over-Center)
+- Rechte Tasche:   P(+120, −40)  → θ_L ≈ 37.7°  , θ_R ≈ −108.8° (Over-Center)
 
 ## Software-Bausteine
-1. **`Kinematics`** (hardwarefrei, pure Mathematik): `bool calculateIK(X, Y, &thetaL, &thetaR)`.
-2. **`ServoController`**: Servowinkel → PWM (500–2500 µs), mit Kalibrier-Offsets (`zeroOffsetLeft`/`zeroOffsetRight`) und Invertier-Flags (`invertLeft`/`invertRight`).
-3. **`MotionPlanner`**: nicht-blockierende Bahn (Sprung oder interpolierter Sweep; IK in jedem Zeitschritt).
+1. **`Kinematics`** (hardwarefrei): bimodale IK + Kollisionsfilter + `isReachable(x, y)` + Hysterese.
+2. **`Workspace`** (hardwarefrei): Raster-Karte der erreichbaren Punkte, `nearestValid()` (Snap), `findPath()` (A*).
+3. **`ServoController`**: Servowinkel → PWM (500–2500 µs), mit Kalibrier-Offsets und Invertier-Flags.
+4. **`MotionPlanner`**: nicht-blockierende Bahn (Sprung/Sweep; IK in jedem Zeitschritt).
+5. **`CommandParser`**: Textbefehle → strukturierter `Command`.
 
 ## Rahmen
 - ESP32-S3, PlatformIO, Arduino-Framework, C++ (gnu++17).
