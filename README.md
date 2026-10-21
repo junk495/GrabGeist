@@ -64,4 +64,4 @@ pio test -e test              # Unit-Tests (nativ)
 
 ## Lizenz
 
-Noch offen.
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) – Namensnennung, nicht-kommerziell, Weitergabe unter gleichen Bedingungen. Details siehe `LICENSE`.
