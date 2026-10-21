@@ -1,4 +1,4 @@
-# Verkabelung — HostageTarget (Probeaufbau)
+# Verkabelung — GrabGeist (Probeaufbau)
 
 > Gültig für den ersten Aufbau mit **ESP32-S3 DevKitC-1 (N16R8)** und
 > **2× Miuzei MS62-2-D-B** (25kg-Digital-RC-Servo, 270°, 4,8–8,4 V, 500–2500 µs).

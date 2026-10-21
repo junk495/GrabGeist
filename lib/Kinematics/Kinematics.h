@@ -1,5 +1,5 @@
 // Kinematics.h
-// Inverse Kinematik fuer das 5-Gelenk-Zielsystem (HostageTarget).
+// Inverse Kinematik fuer das 5-Gelenk-Getriebe (GrabGeist).
 // Reine Mathematik - hardwareunabhaengig. Einheit: mm, Winkel in Radiant.
 // Bimodal (Knie nach aussen + Over-Center >180 Grad) mit Kollisions-Checks.
 
@@ -58,7 +58,7 @@ public:
     // Vorwaerts-Kinematik (fuer Tests/Debug, oberer Schnittpunkt).
     static bool forwardKinematics(float thetaL, float thetaR, float& x, float& y);
 
-    // Winkel der Ziel-Zentrallinie psi [rad].
+    // Winkel der Geist-Zentrallinie psi [rad].
     static bool calculateTargetCenterlineAngle(float x, float y, float& psi);
 
 private:

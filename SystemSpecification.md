@@ -1,20 +1,20 @@
-# Systemspezifikation: 2D-planares 5-Gelenk-Zielsystem (Inverse Kinematik)
+# Systemspezifikation: GrabGeist — 2D-planares 5-Gelenk-Getriebe (Inverse Kinematik)
 
 ## 1. Projektübersicht
-Entwicklung einer C++-Firmware (ESP32, PlatformIO) zur Steuerung eines dynamischen Hostage-Target-Systems (Geiselziel) auf Basis eines symmetrischen, ebenen 5-Gelenk-Parallelgetriebes (Fünfgelenkgetriebe) mit 2 Freiheitsgraden (2-DOF).
+Entwicklung einer C++-Firmware (ESP32, PlatformIO) zur Steuerung eines Geists (GrabGeist), der hinter einem Grabstein immer wieder hervorschaut, auf Basis eines symmetrischen, ebenen 5-Gelenk-Parallelgetriebes (Fünfgelenkgetriebe) mit 2 Freiheitsgraden (2-DOF).
 Der Nutzer bzw. das System gibt die gewünschten kartesischen Koordinaten $(X, Y)$ des zentralen Gelenks (End-Effektor) vor; die Firmware berechnet daraus in Echtzeit die benötigten Servowinkel $(\theta_L, \theta_R)$ mittels inverser Kinematik (IK).
 
 ### Mechanik-Übersicht
 - **2 Servos** an der Basis ($S_L$, $S_R$) treiben je eine **Kurbel** (Kurbelarm, Länge $L_1$) an.
 - Jede Kurbel ist mit einer **Schubstange** (Länge $L_2$) verbunden.
 - Beide Schubstangen treffen sich im **zentralen Gelenk** $P(X, Y)$ – dem End-Effektor.
-- Am selben Punkt ist mittig eine **Querstange** drehbar gelagert; zwei Gummibänder (links und rechts des Lagers, je eines pro Schubstange) halten diese Querstange **senkrecht zur Winkelhalbierenden** der Schubstangen. Auf der Querstange ist **nach oben** das Pappziel montiert (siehe §3).
+- Am selben Punkt ist mittig eine **Querstange** drehbar gelagert; zwei Gummibänder (links und rechts des Lagers, je eines pro Schubstange) halten diese Querstange **senkrecht zur Winkelhalbierenden** der Schubstangen. Auf der Querstange ist **nach oben** der Geist montiert (siehe §3).
 
 ### Skizze (Prinzip)
 ```
                         +-------------+
-                        |    ZIEL     |   <- Pappziel (Hostage-Target),
-                        |  (Target)   |      nach oben auf der Querstange
+                        |    GEIST    |   <- Geist (Ghost),
+                        |   (Ghost)   |      nach oben auf der Querstange
                         +------+------+
                                |
                                |   psi = phi  (Ziel entlang der
@@ -78,8 +78,8 @@ Aus den 2×2 = **4 Kandidaten-Paaren** wird das erste **kollisionsfreie** Paar g
 
 Die Over-Center-Lösung ($\theta > 180°$ bzw. negativ) erschließt die unteren seitlichen „Taschen" (negatives $Y$) → **nierenförmiger** Arbeitsraum.
 
-### Ausrichtung des Zielkopfes (elastische Kopplung über Querstange):
-Am zentralen Gelenk $P(X, Y)$ (hier treffen die beiden Schubstangen zusammen) ist mittig eine weitere **Querstange** drehbar gelagert. Links und rechts des Lagers sind zwei schwarze Gummibänder befestigt – eines zur linken Schubstange ($L_{2,L}$) und eines zur rechten Schubstange ($L_{2,R}$) –, damit die Querstange nicht frei dreht. Diese elastische Kopplung hält die Querstange stets **im rechten Winkel (senkrecht) zur Winkelhalbierenden** der beiden Schubstangen: Steht die Winkelhalbierende senkrecht, liegt die Querstange waagerecht. Auf dieser Querstange ist **nach oben** das Pappziel montiert; das Ziel zeigt dadurch immer **entlang der Winkelhalbierenden** (senkrecht zur Querstange).
+### Ausrichtung des Geisterkopfs (elastische Kopplung über Querstange):
+Am zentralen Gelenk $P(X, Y)$ (hier treffen die beiden Schubstangen zusammen) ist mittig eine weitere **Querstange** drehbar gelagert. Links und rechts des Lagers sind zwei schwarze Gummibänder befestigt – eines zur linken Schubstange ($L_{2,L}$) und eines zur rechten Schubstange ($L_{2,R}$) –, damit die Querstange nicht frei dreht. Diese elastische Kopplung hält die Querstange stets **im rechten Winkel (senkrecht) zur Winkelhalbierenden** der beiden Schubstangen: Steht die Winkelhalbierende senkrecht, liegt die Querstange waagerecht. Auf dieser Querstange ist **nach oben** der Geist montiert; er zeigt dadurch immer **entlang der Winkelhalbierenden** (senkrecht zur Querstange).
 1. Positionen der Ellbogen (Knie) links und rechts:
    $$E_L = (-D/2 + L_1 \cos(\theta_L), \, L_1 \sin(\theta_L))$$
    $$E_R = (+D/2 + L_1 \cos(\theta_R), \, L_1 \sin(\theta_R))$$
@@ -91,9 +91,9 @@ Am zentralen Gelenk $P(X, Y)$ (hier treffen die beiden Schubstangen zusammen) is
 4. Winkel der Querstange $\theta_q$ (senkrecht zur Winkelhalbierenden):
    $$\theta_q = \phi + 90^\circ$$
    *(Bei $X = 0$ ist $\phi = 90^\circ$, die Querstange liegt also waagerecht.)*
-5. Resultierender Winkel der Ziel-Zentrallinie $\psi$ (Pappziel nach oben auf der Querstange montiert, also senkrecht zur Querstange und damit entlang der Winkelhalbierenden):
+5. Resultierender Winkel der Geist-Zentrallinie $\psi$ (Geist nach oben auf der Querstange montiert, also senkrecht zur Querstange und damit entlang der Winkelhalbierenden):
    $$\psi = \theta_q - 90^\circ = \phi = \frac{\gamma_L + \gamma_R}{2}$$
-   *(Bei $X = 0$ ist $\psi = 90^\circ$ ($\pi/2$ rad), das Ziel steht also senkrecht/aufrecht. Wandert $P$ seitlich, kippt die Winkelhalbierende und damit das Ziel in die Peek-Richtung.)*
+   *(Bei $X = 0$ ist $\psi = 90^\circ$ ($\pi/2$ rad), der Geist steht also senkrecht/aufrecht. Wandert $P$ seitlich, kippt die Winkelhalbierende und damit der Geist in die Peek-Richtung.)*
 
 ## 4. Sicherheit, Singularitäten & Arbeitsraum (KRITISCH)
 Der IK-Löser (`bool calculateIK(...)`) MUSS ungültige/kollidierende Koordinaten mit `false` ablehnen, bevor die Servos bewegt werden. Die Gültigkeit ergibt sich aus **7 Prüfungen**:

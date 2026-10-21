@@ -1,13 +1,13 @@
-# HostageTarget
+# GrabGeist
 
-Dynamisches Übungsziel, das hinter einem Pfosten hervor „peekt" – angetrieben von einem ebenen
+Ein Geist, der hinter einem Grabstein immer wieder hervorschaut – angetrieben von einem ebenen
 5-Gelenk-Parallelgetriebe (Fünfgelenkgetriebe) mit **2 Servos**.
 
 ## Kernidee
 
 Der Nutzer steuert **nicht** die beiden Servos, sondern die **Zielposition** des zentralen
 Lagerpunkts. Eine Handy-Oberfläche zeigt den tatsächlich erreichbaren – **nierenförmigen** –
-Arbeitsraum; ein Tipp auf die Karte lässt das Ziel dorthin fahren. Die Firmware berechnet die
+Arbeitsraum; ein Tipp auf die Karte lässt den Geist dorthin fahren. Die Firmware berechnet die
 Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) automatisch aus.
 
 ## Mechanik
@@ -51,8 +51,8 @@ pio test -e test              # Unit-Tests (nativ)
 
 1. Firmware auf den ESP32-S3 flashen.
 2. `tools/test_gui.html` im Browser öffnen (Android: Chrome, Web Bluetooth).
-3. „Verbinden" → Gerät **„HostageTarget"** wählen.
-4. Auf die grüne Karte tippen → das Ziel fährt dorthin (der ESP32 sucht den Weg um die Sperrzone).
+3. „Verbinden" → Gerät **„GrabGeist"** wählen.
+4. Auf die grüne Karte tippen → der Geist fährt dorthin (der ESP32 sucht den Weg um die Sperrzone).
 
 ## Dokumentation
 

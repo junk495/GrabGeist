@@ -1,12 +1,13 @@
-# Steuerungskonzept — HostageTarget
+# Steuerungskonzept — GrabGeist
 
 > Ergänzt `SystemSpecification.md` (§5.4 Betriebsmodi) um die Frage:
-> **Wie bedient der Anwender das Ziel?** (Tasten, Joystick, Handy, Web-UI)
+> **Wie bedient der Anwender den Geist?** (Tasten, Joystick, Handy, Web-UI)
 
 ## 1. Ziel & Ausgangslage
 
-In der Praxis bedient **nicht der Schütze** das Ziel, sondern ein **Trainer/Ausbilder**,
-der neben dem Schützen steht und **auf den Schützen schaut – nicht auf sein Handy**.
+Der GrabGeist läuft meist **autonom** (`AUTO`/`RANDOM`) und schaut in unregelmäßigen
+Abständen hinter dem Grabstein hervor. Wer ihn **live** steuern will (Handy oder Taster),
+tut das meist „blind" – während man auf die Reaktion der Besucher achtet.
 
 Daraus folgt die wichtigste Regel:
 
@@ -36,8 +37,8 @@ Die Optionen ergänzen sich – **nicht** entweder/oder. Alle Eingaben laufen am
 
 **Warum Tasten als Basis?**
 - Sofortige Reaktion, zuverlässig, blind bedienbar.
-- Für einen Schießstand wichtig: eine **physische „Verstecken/Stopp"-Taste** ist das
-  zuverlässigste Sicherheitselement.
+- Praktisch: eine **physische „Verstecken/Stopp"-Taste**, um den Geist sofort wieder zu
+  verstecken.
 
 **Warum BLE statt WiFi fürs Handy?**
 - Direkt Gerät↔Handy, keine Netz-Konfiguration, niedrige Latenz.
@@ -106,6 +107,6 @@ Hinweise:
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 
 - Exakte **Preset-Koordinaten** für `PEEK left/right/top/hide` → aus Fusion/CAD ableiten.
-- **„Versteckt"-Position**: wo steht das Ziel sicher hinter dem Pfosten?
+- **„Versteckt"-Position**: wo verschwindet der Geist sicher hinter dem Grabstein?
 - Eigene App: **ja/nein** (erst mit generischer BLE-Terminal-App starten).
 - Parameter-Set für `PARAM` (Dauern, Geschwindigkeiten, RANDOM-Bereiche) finalisieren.

@@ -44,7 +44,7 @@ void test_ik_roundtrip(void) {
     }
 }
 
-// Bei X = 0 zeigt die Ziel-Zentrallinie senkrecht nach oben (psi = 90 Grad).
+// Bei X = 0 zeigt die Geist-Zentrallinie senkrecht nach oben (psi = 90 Grad).
 void test_target_centerline_up(void) {
     float psi = 0.0f;
     TEST_ASSERT_TRUE(Kinematics::calculateTargetCenterlineAngle(0.0f, 170.0f, psi));

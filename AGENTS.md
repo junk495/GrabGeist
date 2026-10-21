@@ -1,7 +1,7 @@
 # AGENTS.md — Projektleitfaden für KI-Agenten
 
 ## Projekt
-**HostageTarget**: dynamisches Übungsziel, das hinter einem Pfosten hervor „peekt".
+**GrabGeist**: ein Geist, der hinter einem Grabstein immer wieder hervorschaut.
 Mechanik: symmetrisches, ebenes 2-DOF-5-Gelenk-Parallelgetriebe (Fünfgelenkgetriebe), angetrieben von 2 Servos.
 
 > **Autoritative Spezifikation:** `SystemSpecification.md`

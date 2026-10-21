@@ -326,7 +326,7 @@ bool Kinematics::calculateTargetCenterlineAngle(float x, float y, float& psi) {
     const float gammaL = std::atan2(y - ely, x - elx);
     const float gammaR = std::atan2(y - ery, x - erx);
 
-    // Ziel-Zentrallinie = Winkelhalbierende der beiden Schubstangen
+    // Geist-Zentrallinie = Winkelhalbierende der beiden Schubstangen
     psi = (gammaL + gammaR) / 2.0f;
     return true;
 }

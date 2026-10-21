@@ -1,4 +1,4 @@
-// main.cpp — HostageTarget Firmware (ESP32-S3)
+// main.cpp — GrabGeist Firmware (ESP32-S3)
 //
 // Test-Steuerung ueber BLE (Handy):
 //   BLE -> CommandParser -> MotionPlanner -> Kinematics -> ServoController -> LEDC
@@ -42,7 +42,7 @@ static const float POS_RIGHT_X = 50.0f,  POS_RIGHT_Y = 150.0f;
 
 // "Versteckt" als direkte Servo-Position (am Aufbau ermittelt).
 // Kein IK-Punkt: die Kurbeln stehen dabei weit auseinander (Schubstangen
-// treffen sich nicht) -> Ziel liegt tief hinter dem Pfosten.
+// treffen sich nicht) -> Geist liegt tief hinter dem Grabstein.
 static const uint16_t HIDE_PULSE_L = 1660;
 static const uint16_t HIDE_PULSE_R = 1350;
 
@@ -345,9 +345,9 @@ void setup() {
 
     // BLE starten
     ble.setLineCallback(handleLine);
-    ble.begin("HostageTarget");
+    ble.begin("GrabGeist");
 
-    Serial.println("HostageTarget bereit (BLE).");
+    Serial.println("GrabGeist bereit (BLE).");
 }
 
 void loop() {

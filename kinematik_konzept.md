@@ -1,7 +1,7 @@
-# Kinematik-Konzept: 5-Gelenk-Zielsystem (Inverse Kinematik)
+# Kinematik-Konzept: 5-Gelenk-Getriebe (Inverse Kinematik)
 
 ## Kernidee
-Ein Übungsziel („Hostage Target") wird über ein ebenes 5-Gelenk-Parallelgetriebe mit **2 Servos** bewegt.
+Ein Geist (GrabGeist) wird über ein ebenes 5-Gelenk-Parallelgetriebe mit **2 Servos** bewegt.
 Der Nutzer steuert **nicht** die einzelnen Servos, sondern die **resultierende Zielposition P(X, Y)**.
 Die Software berechnet daraus die benötigten Servowinkel (Inverse Kinematik, IK).
 
@@ -11,7 +11,7 @@ Die Software berechnet daraus die benötigten Servowinkel (Inverse Kinematik, IK
 - An jeder Kurbel hängt eine **Schubstange** (Länge **L2 = 125 mm**).
 - Beide Schubstangen treffen sich im **zentralen Gelenk P(X, Y)** (End-Effektor).
 - Am selben Punkt P ist eine **Querstange** drehbar gelagert (über 2 Gummibänder senkrecht zur
-  Winkelhalbierenden der Schubstangen gehalten); darauf steht **nach oben** das Pappziel.
+  Winkelhalbierenden der Schubstangen gehalten); darauf steht **nach oben** der Geist.
 
 > Alle Maße als **leicht anpassbare Konstanten** (`constexpr float`, Einheit mm) führen.
 
@@ -44,15 +44,15 @@ Der IK-Solver (`bool calculateIK(...)`) muss ungültige/kollidierende Koordinate
 4. **Zentrale Sperrzone (Servogehäuse):** P darf nicht in [−45, +45] × [−60, +20] liegen.
 5. **Link↔Achsen-Clearance:** Kurbeln/Schubstangen halten ≥ 18 mm Abstand zur gegenüberliegenden Servoachse.
 6. **Kein Kreuz/Verklemmen:** Kurbeln kreuzen sich nicht; Ellbogen-Abstand ≥ 30 mm; Stangen kreuzen keine Kurbel.
-7. **Gelenk-Orientierung:** P bleibt auf der positiven Seite von E_L→E_R (kein Umklappen des Ziels).
+7. **Gelenk-Orientierung:** P bleibt auf der positiven Seite von E_L→E_R (kein Umklappen des Geists).
 
-## Ziel-Ausrichtung (Kopf-Orientierung, optional)
+## Geist-Ausrichtung (Kopf-Orientierung, optional)
 - Ellbogen:  E_L = (−D/2 + L1·cos θ_L, L1·sin θ_L) ,  E_R = (+D/2 + L1·cos θ_R, L1·sin θ_R)
 - Schubstangenwinkel:  γ_L = atan2(Y − E_L.y, X − E_L.x) ,  γ_R = atan2(Y − E_R.y, X − E_R.x)
 - Winkelhalbierende:  φ = (γ_L + γ_R)/2
 - Querstange (senkrecht zu φ):  θ_q = φ + 90°
-- Ziel-Zentrallinie (senkrecht auf Querstange → entlang φ):  **ψ = φ**
-  (Bei X = 0 steht das Ziel senkrecht; wandert P seitlich, kippt es in die Peek-Richtung.)
+- Geist-Zentrallinie (senkrecht auf Querstange → entlang φ):  **ψ = φ**
+  (Bei X = 0 steht der Geist senkrecht; wandert P seitlich, kippt er in die Peek-Richtung.)
 
 ## Plausibilitäts-Beispiel (D = 65, L1 = 90, L2 = 125)
 - Mitte:           P(0, 170)     → θ_L ≈ 123.1° , θ_R ≈ 56.9°   (Knie nach außen)
