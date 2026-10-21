@@ -9,6 +9,9 @@
 #include <Kinematics.h>
 #include <MotionPlanner.h>
 #include <ServoController.h>
+#include <Workspace.h>
+
+#include <string>
 
 #include "BleUart.h"
 
@@ -47,6 +50,7 @@ static const uint16_t HIDE_PULSE_R = 1350;
 static MotionPlanner   planner;
 static ServoController servos;
 static BleUart         ble;
+static Workspace       workspace;
 
 // Zuletzt an die Servo-Pins ausgegebene PWM-Pulsbreiten (fuer die Monitor-Ausgabe).
 static uint16_t lastPulseL = 0;
@@ -77,9 +81,16 @@ void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     }
 }
 
+// Zuletzt gueltige Kurbelwinkel (Hysterese-Hint fuer die bimodale IK).
+static float lastThetaL = 0.0f;
+static float lastThetaR = 0.0f;
+
 void moveToPosition(float x, float y) {
     float thetaL = 0.0f, thetaR = 0.0f;
-    if (Kinematics::calculateIK(x, y, thetaL, thetaR)) {
+    // Hysterese: die naechste gueltige Konfiguration zu den aktuellen Winkeln waehlen.
+    if (Kinematics::calculateIK(x, y, lastThetaL, lastThetaR, thetaL, thetaR)) {
+        lastThetaL = thetaL;
+        lastThetaR = thetaR;
         lastPulseL = servos.angleToPulseUsLeft(thetaL);
         lastPulseR = servos.angleToPulseUsRight(thetaR);
         lastIkValid = true;
@@ -190,6 +201,29 @@ void updateAutoMode() {
 // BLE-Empfang: eine Zeile -> Befehl parsen und ausfuehren.
 // (Wird aus dem BLE-Kontext aufgerufen; fuer den Testbetrieb reicht das.)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Workspace-Karte als Text an das Handy senden (Header + '0'/'1'-Zeilen).
+// ---------------------------------------------------------------------------
+void sendMap() {
+    char hdr[64];
+    snprintf(hdr, sizeof(hdr), "MAP %d %d %.0f %.0f %.0f",
+             workspace.width(), workspace.height(),
+             workspace.xMin(), workspace.yMin(), workspace.step());
+    ble.sendLine(hdr);
+
+    const auto& grid = workspace.grid();
+    std::string row;
+    row.reserve(workspace.width());
+    for (int cy = 0; cy < workspace.height(); ++cy) {
+        row.clear();
+        for (int cx = 0; cx < workspace.width(); ++cx) {
+            row += (grid[cy * workspace.width() + cx] != 0) ? '1' : '0';
+        }
+        ble.sendLine(row.c_str());
+    }
+    ble.sendLine("MAP_DONE");
+}
+
 void handleLine(const char* line) {
     Command cmd;
     if (!CommandParser::parse(line, cmd)) {
@@ -198,14 +232,30 @@ void handleLine(const char* line) {
     }
 
     switch (cmd.type) {
-        case Command::Type::MOVE:
+        case Command::Type::MOVE: {
             autoActive = false;
             directMode = false;
-            planner.moveTo(cmd.x, cmd.y,
-                           cmd.snap ? MotionPlanner::MoveType::SNAP
-                                    : MotionPlanner::MoveType::SMOOTH);
+
+            // Ziel auf den naechsten gueltigen Punkt snappen
+            float tx = cmd.x, ty = cmd.y;
+            workspace.nearestValid(cmd.x, cmd.y, tx, ty);
+
+            if (cmd.snap) {
+                planner.moveTo(tx, ty, MotionPlanner::MoveType::SNAP);
+            } else {
+                // Pfad vom aktuellen Punkt (ggf. gesnappt) zum Ziel (A* um die Sperrzone)
+                float sx = planner.x(), sy = planner.y();
+                workspace.nearestValid(sx, sy, sx, sy);
+                std::vector<Point> path;
+                if (workspace.findPath(sx, sy, tx, ty, path)) {
+                    planner.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
+                } else {
+                    planner.moveTo(tx, ty, MotionPlanner::MoveType::SMOOTH);
+                }
+            }
             ble.sendLine("OK");
             break;
+        }
 
         case Command::Type::PEEK:
             autoActive = false;
@@ -258,6 +308,10 @@ void handleLine(const char* line) {
             break;
         }
 
+        case Command::Type::MAP:
+            sendMap();
+            break;
+
         default:
             break;
     }
@@ -280,6 +334,10 @@ void setup() {
     const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
     Serial.printf("LEDC attach: L=%d R=%d\n", ledcL, ledcR);
+
+    // Arbeitsraum-Karte berechnen (fuer Tap-to-Move und Pfadplanung)
+    workspace.generate();
+    Serial.printf("Workspace: %d x %d\n", workspace.width(), workspace.height());
 
     // Startposition: versteckt (direkte Servo-Position)
     planner.setPosition(0.0f, 170.0f);   // Planner-Referenz fuer nachfolgende IK-Bewegungen

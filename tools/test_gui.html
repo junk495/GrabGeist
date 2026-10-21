@@ -10,7 +10,9 @@
   .row { margin: 16px 0; }
   input[type=range] { width: 70%; vertical-align: middle; }
   #status { font-family: monospace; color: #333; margin-left: 8px; }
+  #map { border: 1px solid #333; width: 100%; max-width: 460px; image-rendering: pixelated; touch-action: none; }
   hr { margin: 20px 0; }
+  .hint { color: #666; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -19,26 +21,17 @@
 <button id="connect">Verbinden</button>
 <span id="status">nicht verbunden</span>
 
-<div class="row">
-  <label>X (mm): <input type="range" id="x" min="-200" max="200" value="0" step="1"></label>
-  <span id="xval">0</span>
-</div>
-<div class="row">
-  <label>Y (mm): <input type="range" id="y" min="-210" max="210" value="170" step="1"></label>
-  <span id="yval">170</span>
-</div>
-<div class="row">
-  <button id="send">MOVE (weich)</button>
-  <button id="snap">MOVE (Sprung)</button>
-</div>
+<hr>
+<canvas id="map" width="89" height="74"></canvas>
+<p class="hint">Tippe auf die Karte (gr&uuml;n = erreichbar). Der ESP32 sucht den Weg um die Sperrzone.</p>
 
 <hr>
 <div>
   <!-- Links/Rechts sind IK-Presets. "Beide oben" ist die Montage-Referenz
-       (beide Kurbeln senkrecht nach oben, theta = 90°). "Versteckt" ist eine
+       (beide Kurbeln senkrecht nach oben, theta = 90&deg;). "Versteckt" ist eine
        direkte Servo-Position. -->
-  <button data-cmd="PEEK left"  data-x="-50" data-y="150">Links</button>
-  <button data-cmd="PEEK right" data-x="50"  data-y="150">Rechts</button>
+  <button data-cmd="PEEK left">Links</button>
+  <button data-cmd="PEEK right">Rechts</button>
   <button data-cmd="PEEK top">Beide oben</button>
   <button data-cmd="PEEK hide">Versteckt</button>
   <button id="stop">STOP</button>
@@ -47,23 +40,22 @@
 <hr>
 <div>
   <button id="auto">AUTO (Ablauf)</button>
-  <span style="color:#666">links → oben → rechts → versteckt · 1 s Wechsel / 2 s Halten</span>
+  <span class="hint">links &rarr; oben &rarr; rechts &rarr; versteckt &middot; 1 s / 2 s</span>
 </div>
 
 <hr>
 <div>
-  <h3>Direkte Servo-Steuerung (RAW, voller 270°-Bereich)</h3>
+  <h3>Direkte Servo-Steuerung (RAW, voller 270&deg;-Bereich)</h3>
   <div class="row">
-    <label>Servo L (µs): <input type="range" id="rawL" min="500" max="2500" value="1500" step="10"></label>
+    <label>Servo L (&micro;s): <input type="range" id="rawL" min="500" max="2500" value="1500" step="10"></label>
     <span id="rawLval">1500</span>
   </div>
   <div class="row">
-    <label>Servo R (µs): <input type="range" id="rawR" min="500" max="2500" value="1500" step="10"></label>
+    <label>Servo R (&micro;s): <input type="range" id="rawR" min="500" max="2500" value="1500" step="10"></label>
     <span id="rawRval">1500</span>
   </div>
   <div class="row">
     <button id="rawSend">RAW senden</button>
-    <span style="color:#666">Setzt beide Servos direkt auf die gewählten Pulsbreiten (500–2500 µs).</span>
   </div>
 </div>
 
@@ -76,16 +68,69 @@ let rxChar = null;
 let txChar = null;
 
 const status = document.getElementById('status');
-const xSlider = document.getElementById('x');
-const ySlider = document.getElementById('y');
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
 
-xSlider.oninput = () => document.getElementById('xval').textContent = xSlider.value;
-ySlider.oninput = () => document.getElementById('yval').textContent = ySlider.value;
+let mapInfo = null;
+let mapRows = [];
+let mapComplete = false;
 
 function send(line) {
   if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
   rxChar.writeValue(new TextEncoder().encode(line + '\n'));
 }
+
+function renderMap() {
+  canvas.width = mapInfo.w;
+  canvas.height = mapInfo.h;
+  const img = ctx.createImageData(mapInfo.w, mapInfo.h);
+  for (let cy = 0; cy < mapInfo.h; cy++) {
+    const row = mapRows[cy] || '';
+    for (let cx = 0; cx < mapInfo.w; cx++) {
+      const valid = (cx < row.length) && row[cx] === '1';
+      const py = mapInfo.h - 1 - cy;   // Y-Spiegelung (oben = yMax)
+      const idx = (py * mapInfo.w + cx) * 4;
+      img.data[idx]     = valid ? 34  : 40;
+      img.data[idx + 1] = valid ? 139 : 40;
+      img.data[idx + 2] = valid ? 34  : 40;
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function handleRxLine(line) {
+  line = line.trim();
+  if (line.startsWith('MAP ')) {
+    const p = line.split(' ');
+    mapInfo = { w: +p[1], h: +p[2], xMin: +p[3], yMin: +p[4], step: +p[5] };
+    mapRows = [];
+    mapComplete = false;
+    status.textContent = 'Karte empfangen...';
+  } else if (mapInfo && !mapComplete) {
+    mapRows.push(line);
+    if (mapRows.length >= mapInfo.h) {
+      mapComplete = true;
+      renderMap();
+      status.textContent = 'Karte geladen';
+    }
+  } else {
+    status.textContent = 'RX: ' + line;
+  }
+}
+
+function onTap(e) {
+  if (!mapComplete) return;
+  const rect = canvas.getBoundingClientRect();
+  const px = Math.floor((e.clientX - rect.left) / rect.width * canvas.width);
+  const py = Math.floor((e.clientY - rect.top) / rect.height * canvas.height);
+  const cx = Math.max(0, Math.min(mapInfo.w - 1, px));
+  const cy = Math.max(0, Math.min(mapInfo.h - 1, mapInfo.h - 1 - py)); // Y-Spiegelung
+  const x = mapInfo.xMin + cx * mapInfo.step;
+  const y = mapInfo.yMin + cy * mapInfo.step;
+  send(`MOVE ${x.toFixed(0)} ${y.toFixed(0)}`);
+}
+canvas.addEventListener('click', onTap);
 
 async function connect() {
   try {
@@ -98,44 +143,27 @@ async function connect() {
     txChar = await service.getCharacteristic(TX_UUID);
     await txChar.startNotifications();
     txChar.addEventListener('characteristicvaluechanged', (e) => {
-      const text = new TextDecoder().decode(e.target.value);
-      status.textContent = 'RX: ' + text.trim();
+      handleRxLine(new TextDecoder().decode(e.target.value));
     });
     status.textContent = 'verbunden';
+    send('MAP');   // Arbeitsraum-Karte anfordern
   } catch (err) {
     status.textContent = 'Fehler: ' + err;
   }
 }
 
-function setSliders(x, y) {
-  xSlider.value = x;
-  ySlider.value = y;
-  document.getElementById('xval').textContent = x;
-  document.getElementById('yval').textContent = y;
-}
-
 document.getElementById('connect').onclick = connect;
-document.getElementById('send').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value}`);
-document.getElementById('snap').onclick = () => send(`MOVE ${xSlider.value} ${ySlider.value} snap`);
-document.getElementById('stop').onclick = () => { setSliders(0, 170); send('STOP'); };
+document.getElementById('stop').onclick = () => send('STOP');
 document.getElementById('auto').onclick = () => send('AUTO');
 document.querySelectorAll('button[data-cmd]').forEach(b => {
-  b.onclick = () => {
-    if (b.dataset.x !== undefined && b.dataset.y !== undefined) {
-      setSliders(b.dataset.x, b.dataset.y);
-    }
-    send(b.dataset.cmd);
-  };
+  b.onclick = () => send(b.dataset.cmd);
 });
 
 const rawLSlider = document.getElementById('rawL');
 const rawRSlider = document.getElementById('rawR');
 rawLSlider.oninput = () => document.getElementById('rawLval').textContent = rawLSlider.value;
 rawRSlider.oninput = () => document.getElementById('rawRval').textContent = rawRSlider.value;
-
-function sendRaw() {
-  send(`RAW ${rawLSlider.value} ${rawRSlider.value}`);
-}
+function sendRaw() { send(`RAW ${rawLSlider.value} ${rawRSlider.value}`); }
 rawLSlider.onchange = sendRaw;
 rawRSlider.onchange = sendRaw;
 document.getElementById('rawSend').onclick = sendRaw;

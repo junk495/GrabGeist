@@ -53,40 +53,30 @@ Der Nutzer bzw. das System gibt die gewünschten kartesischen Koordinaten $(X, Y
   - Linker Servo $S_L = (-D/2, 0) = (-32.5, 0)$
   - Rechter Servo $S_R = (+D/2, 0) = (+32.5, 0)$
 - **Aktoren:** 2× 25kg Digital-RC-Servos (270° Stellbereich, PWM 50Hz–330Hz, Impulsbreite 500µs–2500µs).
+- **Servo-Winkelgrenzen** (aus Kalibrierung abgeleitet, am fertigen Modell VERIFIZIEREN):
+  - $\theta_L \in [27.9°, 297.9°]$ ,  $\theta_R \in [-113.85°, 156.15°]$
+- **Kollisions-Parameter** (am Modell ERPROBEN):
+  - Zentrale Sperrzone (Servogehäuse): $X \in [-45, +45]$ mm , $Y \in [-60, +20]$ mm
+  - Mindestabstand zur gegenüberliegenden Servoachse: 18 mm
+  - Mindest-Ellbogen-Abstand (608ZZ-Gehäuse): 30 mm
 - **Hinweis zu den Maßen:** Alle mechanischen Maße (`D`, `L1`, `L2`, …) werden im späteren Code zentral als leicht anpassbare Konstanten geführt, damit Änderungen nur an einer Stelle nötig sind.
 
-## 3. Mathematisches Modell (Inverse Kinematik)
-Für eine vorgegebene Zielkoordinate $P(X, Y)$ des zentralen Gelenks:
+## 3. Mathematisches Modell (Inverse Kinematik) — bimodal
+Für eine vorgegebene Zielkoordinate $P(X, Y)$ des zentralen Gelenks hat **jeder Arm zwei Lösungen**.
 
-### Berechnung linker Arm:
-1. Vektor von $S_L$ nach $P$:
-   $$\Delta X_L = X - (-D/2)$$
-   $$\Delta Y_L = Y$$
-2. Abstand von $S_L$ nach $P$:
-   $$d_L = \sqrt{\Delta X_L^2 + \Delta Y_L^2}$$
-3. Basiswinkel des Vektors $S_L \to P$:
-   $$\alpha_L = \text{atan2}(\Delta Y_L, \Delta X_L)$$
-4. Innenwinkel des Dreiecks (Kosinussatz):
-   $$\cos(\beta_L) = \frac{L_1^2 + d_L^2 - L_2^2}{2 \cdot L_1 \cdot d_L}$$
-   $$\beta_L = \text{acos}(\cos(\beta_L))$$
-5. Resultierender Kurbelwinkel links $\theta_L$ (gegen den Uhrzeigersinn, von der positiven X-Achse aus gemessen):
-   - **Konfiguration „Knie nach außen" (Standard):**
-     $$\theta_L = \alpha_L + \beta_L$$
+Für einen Arm (Servo bei $S_{L,R}$; $\Delta X = X \mp D/2$ , $\Delta Y = Y$):
+1. Abstand:  $$d = \sqrt{\Delta X^2 + \Delta Y^2}$$
+2. Basiswinkel:  $$\alpha = \text{atan2}(\Delta Y, \Delta X)$$
+3. Innenwinkel (Kosinussatz):  $$\beta = \text{acos}\!\left(\frac{L_1^2 + d^2 - L_2^2}{2 \cdot L_1 \cdot d}\right)$$
+4. Zwei Kandidaten je Arm:
+   - **Linker Arm:**  $\theta_{L,1} = \alpha_L + \beta_L$ („Knie nach außen") ,  $\theta_{L,2} = \alpha_L - \beta_L$ („Over-Center")
+   - **Rechter Arm:**  $\theta_{R,1} = \alpha_R - \beta_R$ („Knie nach außen") ,  $\theta_{R,2} = \alpha_R + \beta_R$ („Over-Center")
 
-### Berechnung rechter Arm:
-1. Vektor von $S_R$ nach $P$:
-   $$\Delta X_R = X - (D/2)$$
-   $$\Delta Y_R = Y$$
-2. Abstand von $S_R$ nach $P$:
-   $$d_R = \sqrt{\Delta X_R^2 + \Delta Y_R^2}$$
-3. Basiswinkel des Vektors $S_R \to P$:
-   $$\alpha_R = \text{atan2}(\Delta Y_R, \Delta X_R)$$
-4. Innenwinkel:
-   $$\cos(\beta_R) = \frac{L_1^2 + d_R^2 - L_2^2}{2 \cdot L_1 \cdot d_R}$$
-   $$\beta_R = \text{acos}(\cos(\beta_R))$$
-5. Resultierender Kurbelwinkel rechts $\theta_R$ (gegen den Uhrzeigersinn, von der positiven X-Achse aus gemessen):
-   - **Konfiguration „Knie nach außen" (Standard):**
-     $$\theta_R = \alpha_R - \beta_R$$
+Aus den 2×2 = **4 Kandidaten-Paaren** wird das erste **kollisionsfreie** Paar gewählt (§4):
+- Standard: „Knie nach außen" bevorzugt.
+- Mit Hysterese-Hint: das dem **aktuellen Servowinkel** nächste Paar (vermeidet Konfigurationssprünge).
+
+Die Over-Center-Lösung ($\theta > 180°$ bzw. negativ) erschließt die unteren seitlichen „Taschen" (negatives $Y$) → **nierenförmiger** Arbeitsraum.
 
 ### Ausrichtung des Zielkopfes (elastische Kopplung über Querstange):
 Am zentralen Gelenk $P(X, Y)$ (hier treffen die beiden Schubstangen zusammen) ist mittig eine weitere **Querstange** drehbar gelagert. Links und rechts des Lagers sind zwei schwarze Gummibänder befestigt – eines zur linken Schubstange ($L_{2,L}$) und eines zur rechten Schubstange ($L_{2,R}$) –, damit die Querstange nicht frei dreht. Diese elastische Kopplung hält die Querstange stets **im rechten Winkel (senkrecht) zur Winkelhalbierenden** der beiden Schubstangen: Steht die Winkelhalbierende senkrecht, liegt die Querstange waagerecht. Auf dieser Querstange ist **nach oben** das Pappziel montiert; das Ziel zeigt dadurch immer **entlang der Winkelhalbierenden** (senkrecht zur Querstange).
@@ -105,30 +95,46 @@ Am zentralen Gelenk $P(X, Y)$ (hier treffen die beiden Schubstangen zusammen) is
    $$\psi = \theta_q - 90^\circ = \phi = \frac{\gamma_L + \gamma_R}{2}$$
    *(Bei $X = 0$ ist $\psi = 90^\circ$ ($\pi/2$ rad), das Ziel steht also senkrecht/aufrecht. Wandert $P$ seitlich, kippt die Winkelhalbierende und damit das Ziel in die Peek-Richtung.)*
 
-## 4. Sicherheit, Singularitäten & Arbeitsraum-Grenzen (KRITISCH)
-Der IK-Löser (`bool calculateIK(float x, float y, float &thetaL, float &thetaR)`) MUSS unerreichbare oder gefährliche Koordinaten zurückweisen und `false` liefern, bevor die Servos bewegt werden:
-1. **Dreiecksungleichung / Reichweitenlimit:**
+## 4. Sicherheit, Singularitäten & Arbeitsraum (KRITISCH)
+Der IK-Löser (`bool calculateIK(...)`) MUSS ungültige/kollidierende Koordinaten mit `false` ablehnen, bevor die Servos bewegt werden. Die Gültigkeit ergibt sich aus **7 Prüfungen**:
+
+1. **Dreiecksungleichung / Reichweite:**
    $$\vert{}L_1 - L_2\vert{} + \epsilon < d_{L,R} < (L_1 + L_2) - \epsilon$$
-   (Mit Sicherheitsabstand $\epsilon \approx 5\text{ mm}$, um Totpunkt-Singularitäten / volles Ausstrecken und Verklemmen zu vermeiden).
+   (Sicherheitsabstand $\epsilon \approx 5\text{ mm}$ → $40\ldots 210$ mm).
 2. **Kosinus-Domänen-Clamping:** Argumente für `acos()` strikt in $[-1.0, 1.0]$ halten.
-3. **Mechanische Kollision & Servo-Grenzen:**
-   - Sicherstellen, dass $\theta_L$ und $\theta_R$ innerhalb der physischen Servo-Stellgrenzen bleiben und nicht mit der Grundplatte oder dem benachbarten Servokörper kollidieren.
-   - Eine sichere Bounding-Box / Arbeitsraum-Polygon für $(X, Y)$ definieren, in dem das Gestänge in Parkstellung hinter dem zentralen Pfosten verborgen bleibt.
+3. **Servo-Winkelgrenzen:**  $\theta_L \in [27.9°, 297.9°]$ ,  $\theta_R \in [-113.85°, 156.15°]$  (aus Kalibrierung, am Modell verifizieren).
+4. **Zentrale Sperrzone (Servogehäuse):**  $P$ darf nicht in $X \in [-45, +45]$ , $Y \in [-60, +20]$ liegen.
+5. **Link↔Achsen-Clearance:**  Kurbeln/Schubstangen halten ≥ 18 mm Abstand zur gegenüberliegenden Servoachse.
+6. **Kein Kreuz/Verklemmen:**  Kurbeln kreuzen sich nicht; Ellbogen-Abstand ≥ 30 mm; Schubstangen kreuzen keine Kurbel.
+7. **Gelenk-Orientierung (kein Umklappen):**
+   $$(E_{R,x} - E_{L,x})(Y - E_{L,y}) - (E_{R,y} - E_{L,y})(X - E_{L,x}) > 0$$
+
+### Arbeitsraum (nierenförmig) & Karte
+Aus den 7 Prüfungen ergibt sich ein **nierenförmiger** Arbeitsraum: große obere Kalotte (positives $Y$) + zwei untere seitliche Taschen (negatives $Y$, über Over-Center), Mitte unten gesperrt (Servogehäuse).
+
+- **Karte (`Workspace`):** Beim Start wird ein Raster ($X \in [-220, +220]$ , $Y \in [-150, +215]$ , Schritt 5 mm) gesampelt; alle gültigen $(X, Y)$ werden als Bitmap abgelegt.
+- **Snapping:** Tippt der Nutzer auf einen ungültigen Punkt, wird der **nächste gültige** Punkt gewählt.
+- **Pfadplanung:** Da der Arbeitsraum nicht-konvex ist, kreuzt eine gerade Linie (z.B. links↔rechts) die Sperrzone → automatischer **Umweg per A***.
 
 ## 5. Anforderungen an die Software-Architektur
-1. **Klasse `Kinematics`:**
-   - Reine Mathematikklasse, hardwareunabhängig.
-   - Wandelt $(X, Y) \to (\theta_L, \theta_R)$ in Radiant/Grad um.
-2. **Klasse `ServoController`:**
+1. **Klasse `Kinematics`:** (hardwarefrei, pure Mathematik)
+   - Bimodale IK: $(X, Y) \to (\theta_L, \theta_R)$ mit 4 Kandidaten + 7 Kollisionsfiltern + Hysterese.
+   - `bool calculateIK(...)` und `bool isReachable(x, y)`.
+2. **Klasse `Workspace`:** (hardwarefrei)
+   - Raster-Karte des Arbeitsraums (`generate()`), `isValid()`, `nearestValid()` (Snap), `findPath()` (A*).
+3. **Klasse `ServoController`:**
    - Bildet kinematische Winkel $(\theta_L, \theta_R)$ auf PWM-Mikrosekunden (`500`–`2500` µs) ab.
    - Muss Kalibrier-Offsets (`zeroOffsetLeft`, `zeroOffsetRight`) und Richtungs-Invertierungs-Flags (`invertLeft`, `invertRight`) enthalten, um Montagetoleranzen der Servohörner auszugleichen.
-3. **`MotionPlanner` / Interpolation:**
+4. **`MotionPlanner` / Interpolation:**
    - Nicht-blockierende Trajektoriengenerierung.
+   - **Hindernisbewusst:** fährt A*-Wegpunkte des `Workspace` ab (Umweg um die Sperrzone) und reicht die aktuellen Winkel als Hysterese-Hint an die IK durch.
    - Zwei Bewegungstypen:
      - **Snap-/Pop-out-Bewegung:** Direkter Sprung zum Ziel $(X, Y)$ mit maximaler physischer Servogeschwindigkeit.
      - **Lineare/sanfte Bewegung (Sweep/Joystick):** Interpoliert zwischen aktuellem $(X_0, Y_0)$ und Ziel $(X_1, Y_1)$ in kleinen Zeitschritten (z.B. 50Hz/20ms Update-Schleife) mit linearer Interpolation oder S-Kurve/Kosinus-Easing; dabei wird in jedem Zwischenschritt der IK-Löser aufgerufen, sodass sich der Kopf auf einer kontrollierten Bahn bewegt.
-4. **Betriebsmodi:**
-   - `MANUAL`: Direkte X/Y-Eingabe (z.B. Joystick/Web-UI/BLE).
+5. **Klasse `CommandParser`:** (hardwarefrei)
+   - Zerlegt Textbefehle (`MOVE`, `PEEK`, `STOP`, `STATUS`, `RAW`, `AUTO`, `MAP`) in einen strukturierten `Command`.
+6. **Betriebsmodi:**
+   - `MANUAL`: Direkte X/Y-Eingabe (Tap-to-Move-Karte / Joystick / BLE).
    - `RECORD_PLAYBACK`: Ringpuffer/Array zur Aufzeichnung von $(X, Y)$-Koordinaten in festen Zeitabständen (z.B. 20Hz) und deren Wiedergabe als Schleife.
    - `RANDOM`: Zustandsmaschine, die zufällig gültige Presets wählt (Versteckt, Links Peek, Rechts Peek, Oben Peek) mit zufälligen Halte- und Versteck-Dauern.
    - `PRESET`: Fest kodierte Trajektorien (Sweep links–rechts, Pop-out und zurück).

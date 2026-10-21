@@ -30,6 +30,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - `lib/MotionPlanner/` — nicht-blockierende Bahnplanung (Sprung/Sweep)
 - `lib/CommandParser/` — Textbefehle → strukturierter `Command`
 - `lib/Workspace/` — erreichbarer Arbeitsraum (Nierenform: Karte, Snap, A*-Pfad)
+- `lib/Point/` — gemeinsamer 2D-Punkt-Typ (`struct Point`, Header-only)
 - `test/` — native Unit-Tests (Unity)
 - `tools/test_gui.html` — Handy-Testoberfläche (Web Bluetooth)
 - `SystemSpecification.md` — Spezifikation (autoritativ)

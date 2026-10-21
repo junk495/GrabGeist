@@ -107,6 +107,44 @@ void test_idle_update(void) {
     TEST_ASSERT_EQUAL_FLOAT(0.0f, mp.y());
 }
 
+// Wegpunkt-Folge (A*-Pfad): wird Segment fuer Segment abgefahren.
+void test_move_along_path_smooth(void) {
+    MotionPlanner mp;
+    mp.setEasing(MotionPlanner::Easing::LINEAR);
+    mp.setDuration(1.0f);
+    std::vector<Point> path = {{0.0f, 0.0f}, {50.0f, 0.0f}, {50.0f, 50.0f}};
+    mp.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
+    TEST_ASSERT_TRUE(mp.isMoving());
+
+    mp.update(0.5f);   // halbes Segment 1
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 25.0f, mp.x());
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, mp.y());
+
+    mp.update(0.5f);   // Segment 1 fertig
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, mp.y());
+    TEST_ASSERT_TRUE(mp.isMoving());
+
+    mp.update(0.5f);   // halbes Segment 2
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 25.0f, mp.y());
+
+    mp.update(0.5f);   // fertig
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.y());
+    TEST_ASSERT_FALSE(mp.isMoving());
+}
+
+// Wegpunkt-Folge mit SNAP springt zum letzten Punkt.
+void test_move_along_path_snap(void) {
+    MotionPlanner mp;
+    std::vector<Point> path = {{0.0f, 0.0f}, {10.0f, 10.0f}, {20.0f, 20.0f}};
+    mp.moveAlongPath(path, MotionPlanner::MoveType::SNAP);
+    TEST_ASSERT_FALSE(mp.isMoving());
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 20.0f, mp.x());
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 20.0f, mp.y());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_snap);
@@ -116,5 +154,7 @@ int main(void) {
     RUN_TEST(test_duration);
     RUN_TEST(test_restart_mid_move);
     RUN_TEST(test_idle_update);
+    RUN_TEST(test_move_along_path_smooth);
+    RUN_TEST(test_move_along_path_snap);
     return UNITY_END();
 }

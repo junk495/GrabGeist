@@ -101,7 +101,7 @@ Hinweise:
 2. **Phase 2:** **BLE-UART** fürs Handy (Moduswahl + Parameter).
 3. **Phase 3 (optional):** analoger **Joystick** (MANUAL/Sweep, RECORD) und/oder Web-UI.
 
-**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), `Kinematics` (bimodal + Kollision) und `Workspace` (Karte/Snap/A*) sind umgesetzt. Als Nächstes: **Tap-to-Move-Oberfläche** (Karte rendern + Antippen), danach `ModeManager`/Tasten und die Modi `RANDOM`/`RECORD`/`PRESET`.
+**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A*) und **Tap-to-Move** (Karte rendern + Antippen; `MOVE` wird über den `Workspace` geroutet, Karte via `MAP`-Befehl übertragen) sind umgesetzt. Es fehlen noch: `ModeManager`/Tasten sowie die Modi `RANDOM`/`RECORD`/`PRESET`.
 
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 

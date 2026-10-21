@@ -107,5 +107,10 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "MAP")) {
+        out.type = Command::Type::MAP;
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }

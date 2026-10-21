@@ -16,23 +16,36 @@ void MotionPlanner::setEasing(Easing easing) {
 void MotionPlanner::setPosition(float x, float y) {
     currentX_ = x;
     currentY_ = y;
+    path_.clear();
     moving_ = false;
 }
 
 void MotionPlanner::moveTo(float x, float y, MoveType type) {
-    if (type == MoveType::SNAP) {
-        // Direkter Sprung: Servo bewegt sich mit maximaler Geschwindigkeit
-        currentX_ = x;
-        currentY_ = y;
+    // Einzelziel = Weg mit zwei Punkten (Start = aktuelle Position).
+    std::vector<Point> wp;
+    wp.push_back({currentX_, currentY_});
+    wp.push_back({x, y});
+    moveAlongPath(wp, type);
+}
+
+void MotionPlanner::moveAlongPath(const std::vector<Point>& waypoints, MoveType type) {
+    if (waypoints.empty()) {
+        return;
+    }
+    if (type == MoveType::SNAP || waypoints.size() == 1) {
+        // Direkter Sprung zum letzten Punkt
+        currentX_ = waypoints.back().x;
+        currentY_ = waypoints.back().y;
+        path_.clear();
         moving_ = false;
         return;
     }
 
-    // SMOOTH: neue Bewegung ab der aktuellen (interpolierten) Position
-    startX_ = currentX_;
-    startY_ = currentY_;
-    targetX_ = x;
-    targetY_ = y;
+    // SMOOTH: Wegpunkte uebernehmen, Start = erster Punkt
+    path_ = waypoints;
+    currentX_ = path_[0].x;
+    currentY_ = path_[0].y;
+    seg_ = 0;
     elapsed_ = 0.0f;
     moving_ = true;
 }
@@ -43,20 +56,27 @@ bool MotionPlanner::update(float dt) {
     }
 
     elapsed_ += dt;
+    const Point& a = path_[seg_];
+    const Point& b = path_[seg_ + 1];
 
-    // Ziel erreicht
+    // Segment abgeschlossen?
     if (elapsed_ >= duration_) {
-        currentX_ = targetX_;
-        currentY_ = targetY_;
-        moving_ = false;
-        return false;
+        currentX_ = b.x;
+        currentY_ = b.y;
+        ++seg_;
+        if (seg_ >= path_.size() - 1) {
+            moving_ = false;   // Pfad fertig
+            return false;
+        }
+        elapsed_ = 0.0f;       // naechstes Segment beginnt
+        return true;
     }
 
     // Fortschritt 0..1 und Easing anwenden
     const float p = elapsed_ / duration_;
     const float e = ease(p);
-    currentX_ = startX_ + (targetX_ - startX_) * e;
-    currentY_ = startY_ + (targetY_ - startY_) * e;
+    currentX_ = a.x + (b.x - a.x) * e;
+    currentY_ = a.y + (b.y - a.y) * e;
     return true;
 }
 

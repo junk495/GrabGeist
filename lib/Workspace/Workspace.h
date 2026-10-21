@@ -8,10 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-struct Point {
-    float x = 0.0f;
-    float y = 0.0f;
-};
+#include <Point.h>
 
 class Workspace {
 public:
