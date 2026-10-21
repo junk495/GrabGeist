@@ -1,6 +1,7 @@
 // Kinematics.h
 // Inverse Kinematik fuer das 5-Gelenk-Zielsystem (HostageTarget).
 // Reine Mathematik - hardwareunabhaengig. Einheit: mm, Winkel in Radiant.
+// Bimodal (Knie nach aussen + Over-Center >180 Grad) mit Kollisions-Checks.
 
 #pragma once
 
@@ -10,36 +11,69 @@ class Kinematics {
 public:
     // ------------------------------------------------------------------
     // Mechanische Parameter (mm) - zentral & leicht anpassbar.
-    // Bei CAD-Aenderungen NUR hier anpassen.
     // ------------------------------------------------------------------
     static constexpr float D       = 65.0f;   // Abstand der beiden Servoachsen
     static constexpr float L1      = 90.0f;   // Kurbellaenge (Kurbelarm)
     static constexpr float L2      = 125.0f;  // Schubstangenlaenge
-    static constexpr float EPSILON = 5.0f;    // Sicherheitsabstand (mm)
+    static constexpr float EPSILON = 5.0f;    // Sicherheitsabstand gegen Totpunkt (mm)
 
     static constexpr float kPi = 3.14159265358979323846f;
-
-    // Grad <-> Radiant
     static constexpr float degToRad(float deg) { return deg * kPi / 180.0f; }
     static constexpr float radToDeg(float rad) { return rad * 180.0f / kPi; }
 
     // ------------------------------------------------------------------
+    // Servo-Winkelgrenzen [rad] (aus der Kalibrierung abgeleitet,
+    // am fertigen Modell VERIFIZIEREN!).
+    //   links  : 500..2500 us  ->  theta =  27.90 .. 297.90 Grad
+    //   rechts : 500..2500 us  ->  theta = -113.85 .. 156.15 Grad
+    // ------------------------------------------------------------------
+    static constexpr float THETA_L_MIN = 27.90f * kPi / 180.0f;
+    static constexpr float THETA_L_MAX = 297.90f * kPi / 180.0f;
+    static constexpr float THETA_R_MIN = -113.85f * kPi / 180.0f;
+    static constexpr float THETA_R_MAX = 156.15f * kPi / 180.0f;
+
+    // ------------------------------------------------------------------
+    // Kollisions-Parameter (mm) - am Modell ERPROBEN!
+    // ------------------------------------------------------------------
+    static constexpr float SERVO_BOX_X_MIN = -45.0f;   // zentrale Sperrzone (Servogehaeuse)
+    static constexpr float SERVO_BOX_X_MAX =  45.0f;
+    static constexpr float SERVO_BOX_Y_MIN = -60.0f;
+    static constexpr float SERVO_BOX_Y_MAX =  20.0f;
+    static constexpr float R_CLEAR        =  18.0f;   // min. Abstand zur gegenueberliegenden Servoachse
+    static constexpr float ELBOW_MIN_DIST =  30.0f;   // min. Ellbogen-Abstand (608ZZ-Gehaeuse)
+
+    // ------------------------------------------------------------------
     // Inverse Kinematik (Kernfunktion).
-    // Zielposition P(x, y) [mm] -> Servowinkel thetaL, thetaR [rad].
-    // Liefert false, wenn die Position unerreichbar/ungueltig ist.
+    // Ohne Hint: bevorzugt "Knie nach aussen".
     // ------------------------------------------------------------------
     static bool calculateIK(float x, float y, float& thetaL, float& thetaR);
 
-    // Vorwaerts-Kinematik (fuer Tests/Debug):
-    // Servowinkel -> Position P(x, y). false, wenn die Schubstangen sich nicht treffen.
+    // Mit Hysterese-Hint: bevorzugt die Konfiguration nahe den aktuellen Winkeln.
+    static bool calculateIK(float x, float y, float hintThetaL, float hintThetaR,
+                            float& thetaL, float& thetaR);
+
+    // Nur Erreichbarkeit pruefen (ohne Winkel-Ausgabe).
+    static bool isReachable(float x, float y);
+
+    // Vorwaerts-Kinematik (fuer Tests/Debug, oberer Schnittpunkt).
     static bool forwardKinematics(float thetaL, float thetaR, float& x, float& y);
 
     // Winkel der Ziel-Zentrallinie psi [rad].
-    // (Das Ziel steht senkrecht auf der Querstange -> es zeigt entlang der
-    //  Winkelhalbierenden der beiden Schubstangen.)
     static bool calculateTargetCenterlineAngle(float x, float y, float& psi);
 
 private:
-    // IK fuer einen einzelnen Arm (servoX = x-Koordinate der Servoachse).
-    static bool solveArm(float x, float y, float servoX, bool isLeft, float& theta);
+    // Kandidaten eines Arms: thetaOut (Knie nach aussen), thetaOver (Over-Center).
+    static bool solveArmCandidates(float x, float y, float servoX, bool isLeft,
+                                   float& thetaOut, float& thetaOver);
+
+    // Kollisions-Checks 2-5 (Check 1 = Servo-Grenzen, macht der Aufrufer).
+    static bool collisionOk(float x, float y, float thetaL, float thetaR);
+    static bool servoBoxOk(float x, float y);
+    static bool clearanceOk(float x, float y, float elx, float ely, float erx, float ery);
+    static bool crossingOk(float x, float y, float elx, float ely, float erx, float ery);
+    static bool hingeOrientationOk(float x, float y, float elx, float ely, float erx, float ery);
+
+    // Kern: Kandidaten berechnen, filtern, auswaehlen (mit/ohne Hint).
+    static bool solveAndSelect(float x, float y, bool hasHint, float hintL, float hintR,
+                               float& thetaL, float& thetaR);
 };

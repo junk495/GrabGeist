@@ -51,6 +51,50 @@ void test_target_centerline_up(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, Kinematics::degToRad(90.0f), psi);
 }
 
+// Untere "Nieren-Taschen" (Over-Center) sind erreichbar.
+void test_lower_pocket_left(void) {
+    TEST_ASSERT_TRUE(Kinematics::isReachable(-120.0f, -40.0f));
+    float thetaL = 0.0f, thetaR = 0.0f;
+    TEST_ASSERT_TRUE(Kinematics::calculateIK(-120.0f, -40.0f, thetaL, thetaR));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(288.8f), thetaL);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(142.3f), thetaR);
+}
+
+void test_lower_pocket_right(void) {
+    TEST_ASSERT_TRUE(Kinematics::isReachable(120.0f, -40.0f));
+    float thetaL = 0.0f, thetaR = 0.0f;
+    TEST_ASSERT_TRUE(Kinematics::calculateIK(120.0f, -40.0f, thetaL, thetaR));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(37.7f), thetaL);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(-108.8f), thetaR);
+}
+
+// Zentrale Sperrzone (Servogehaeuse) ist blockiert.
+void test_servo_box_blocked(void) {
+    TEST_ASSERT_FALSE(Kinematics::isReachable(0.0f, -40.0f));
+    TEST_ASSERT_FALSE(Kinematics::isReachable(0.0f, 0.0f));
+    TEST_ASSERT_FALSE(Kinematics::isReachable(0.0f, 10.0f));
+}
+
+// Hysterese: der Hint waehlt die naechste gueltige Konfiguration.
+// (0,170) hat zwei gueltige Loesungen: beide "Knie nach aussen" (123.1/56.9)
+// oder rechter Arm "Over-Center" (123.1/144.7).
+void test_hysteresis(void) {
+    // Ohne Hint: Knie nach aussen.
+    float tl = 0.0f, tr = 0.0f;
+    TEST_ASSERT_TRUE(Kinematics::calculateIK(0.0f, 170.0f, tl, tr));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(123.1f), tl);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(56.9f), tr);
+
+    // Mit Hint nahe der Over-Center-Loesung des rechten Arms wechselt dieser
+    // auf Over-Center, der linke Arm bleibt bei Knie nach aussen.
+    float tl2 = 0.0f, tr2 = 0.0f;
+    TEST_ASSERT_TRUE(Kinematics::calculateIK(0.0f, 170.0f,
+                                             Kinematics::degToRad(35.0f),
+                                             Kinematics::degToRad(145.0f), tl2, tr2));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(123.1f), tl2);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(144.7f), tr2);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_ik_center);
@@ -58,5 +102,9 @@ int main(void) {
     RUN_TEST(test_ik_unreachable_near);
     RUN_TEST(test_ik_roundtrip);
     RUN_TEST(test_target_centerline_up);
+    RUN_TEST(test_lower_pocket_left);
+    RUN_TEST(test_lower_pocket_right);
+    RUN_TEST(test_servo_box_blocked);
+    RUN_TEST(test_hysteresis);
     return UNITY_END();
 }
