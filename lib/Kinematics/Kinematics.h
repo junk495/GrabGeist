@@ -25,12 +25,12 @@ public:
     // Servo-Winkelgrenzen [rad] (aus der Kalibrierung abgeleitet,
     // am fertigen Modell VERIFIZIEREN!).
     //   links  : 500..2500 us  ->  theta =  27.90 .. 297.90 Grad
-    //   rechts : 500..2500 us  ->  theta = -113.85 .. 156.15 Grad
+    //   rechts : 500..2500 us  ->  theta = -119.25 .. 150.75 Grad
     // ------------------------------------------------------------------
     static constexpr float THETA_L_MIN = 27.90f * kPi / 180.0f;
     static constexpr float THETA_L_MAX = 297.90f * kPi / 180.0f;
-    static constexpr float THETA_R_MIN = -113.85f * kPi / 180.0f;
-    static constexpr float THETA_R_MAX = 156.15f * kPi / 180.0f;
+    static constexpr float THETA_R_MIN = -119.25f * kPi / 180.0f;
+    static constexpr float THETA_R_MAX = 150.75f * kPi / 180.0f;
 
     // ------------------------------------------------------------------
     // Kollisions-Parameter (mm) - am Modell ERPROBEN!

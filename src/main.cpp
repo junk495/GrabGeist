@@ -41,10 +41,9 @@ static const float POS_LEFT_X  = -50.0f, POS_LEFT_Y  = 150.0f;
 static const float POS_RIGHT_X = 50.0f,  POS_RIGHT_Y = 150.0f;
 
 // "Versteckt" als direkte Servo-Position (am Aufbau ermittelt).
-// Kein IK-Punkt: die Kurbeln stehen dabei weit auseinander (Schubstangen
-// treffen sich nicht) -> Geist liegt tief hinter dem Grabstein.
-static const uint16_t HIDE_PULSE_L = 1660;
-static const uint16_t HIDE_PULSE_R = 1350;
+// Kollisionsgrenze: tiefer (= Kurbeln weiter aussen) beruehren sich die Arme.
+static const uint16_t HIDE_PULSE_L = 1580;
+static const uint16_t HIDE_PULSE_R = 1410;
 
 // Software-Bausteine
 static MotionPlanner   planner;
@@ -350,11 +349,11 @@ void setup() {
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
     //   links = 500 us, rechts = 2500 us.
     // Kurbel senkrecht nach oben (theta = 90°):
-    //   links = 960 us, rechts = 2010 us.
+    //   links = 960 us, rechts = 2050 us.
     // Daraus folgt: Servo-Mitte (1500 us) entspricht theta = +162.90° (links)
-    // bzw. theta = +21.15° (rechts). Keine Invertierung.
+    // bzw. theta = +15.75° (rechts). Keine Invertierung.
     servos.setCalibrationLeft(Kinematics::degToRad(162.90f), false);
-    servos.setCalibrationRight(Kinematics::degToRad(21.15f), false);
+    servos.setCalibrationRight(Kinematics::degToRad(15.75f), false);
 
     const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
