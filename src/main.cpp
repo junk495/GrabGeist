@@ -81,6 +81,31 @@ void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     }
 }
 
+// Karte als einen grossen Textblock senden: statt 75 einzelner Zeilen wird der
+// komplette Text aufgebaut und in wenigen, groesseren Notifications verschickt.
+// Schneller und robuster, weil Web Bluetooth bei vielen kleinen Notifications
+// einzelne Zeilen verliert.
+void sendMapChunked() {
+    std::string out;
+    out.reserve(workspace.width() * (workspace.height() + 1) + 64);
+
+    char hdr[64];
+    snprintf(hdr, sizeof(hdr), "MAP %d %d %d %d %d\n",
+             workspace.width(), workspace.height(),
+             (int)workspace.xMin(), (int)workspace.yMin(), (int)workspace.step());
+    out += hdr;
+
+    const std::vector<uint8_t>& grid = workspace.grid();
+    for (int cy = 0; cy < workspace.height(); ++cy) {
+        for (int cx = 0; cx < workspace.width(); ++cx) {
+            out += (grid[cy * workspace.width() + cx] ? '1' : '0');
+        }
+        out += '\n';
+    }
+
+    ble.sendChunked(out.c_str(), out.size());
+}
+
 // Zuletzt gueltige Kurbelwinkel (Hysterese-Hint fuer die bimodale IK).
 static float lastThetaL = 0.0f;
 static float lastThetaR = 0.0f;
@@ -309,7 +334,7 @@ void handleLine(const char* line) {
         }
 
         case Command::Type::MAP:
-            sendMap();
+            sendMapChunked();
             break;
 
         default:

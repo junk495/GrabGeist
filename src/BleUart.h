@@ -21,6 +21,9 @@ public:
     // Zeile an das Handy senden (haengt \n an)
     void sendLine(const char* line);
 
+    // Großen Textblock in MTU-gerechten Chunks senden (fuer die Arbeitsraum-Karte).
+    void sendChunked(const char* data, size_t len);
+
     // BLECharacteristicCallbacks
     void onWrite(BLECharacteristic* characteristic) override;
 

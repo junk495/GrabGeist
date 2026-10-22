@@ -74,6 +74,9 @@ const ctx = canvas.getContext('2d');
 let mapInfo = null;
 let mapRows = [];
 let mapComplete = false;
+let rxBuffer = '';    // Roh-Bytes zwischen Notifications puffern
+let mapTimer = null;  // Timeout fuer unvollstaendige Karte
+let mapRetries = 0;   // Anzahl der Neu-Anforderungen
 
 function send(line) {
   if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
@@ -99,6 +102,23 @@ function renderMap() {
   ctx.putImageData(img, 0, 0);
 }
 
+function clearMapTimeout() {
+  if (mapTimer) { clearTimeout(mapTimer); mapTimer = null; }
+}
+
+function onMapTimeout() {
+  if (mapComplete) return;
+  if (mapRetries < 3) {
+    mapRetries++;
+    status.textContent = 'Karte unvollstaendig (' + mapRows.length + '/' +
+      (mapInfo ? mapInfo.h : '?') + ') - neu anfordern (' + mapRetries + '/3)...';
+    send('MAP');
+    mapTimer = setTimeout(onMapTimeout, 2500);
+  } else {
+    status.textContent = 'Karte fehlgeschlagen - nochmal Verbinden druecken';
+  }
+}
+
 function handleRxLine(line) {
   line = line.trim();
   if (line.startsWith('MAP ')) {
@@ -107,10 +127,15 @@ function handleRxLine(line) {
     mapRows = [];
     mapComplete = false;
     status.textContent = 'Karte empfangen...';
+    clearMapTimeout();
+    mapTimer = setTimeout(onMapTimeout, 2500);
   } else if (mapInfo && !mapComplete) {
+    if (line.length === 0) return;   // Leerzeilen nicht als Reihe zaehlen
     mapRows.push(line);
+    status.textContent = 'Karte empfangen... ' + mapRows.length + '/' + mapInfo.h;
     if (mapRows.length >= mapInfo.h) {
       mapComplete = true;
+      clearMapTimeout();
       renderMap();
       status.textContent = 'Karte geladen';
     }
@@ -143,10 +168,20 @@ async function connect() {
     txChar = await service.getCharacteristic(TX_UUID);
     await txChar.startNotifications();
     txChar.addEventListener('characteristicvaluechanged', (e) => {
-      handleRxLine(new TextDecoder().decode(e.target.value));
+      // Notifications koennen Zeilen splitten oder mehrere Zeilen buendeln.
+      // Bytes puffern und erst bei '\n' als komplette Zeile auswerten.
+      rxBuffer += new TextDecoder().decode(e.target.value);
+      let nl;
+      while ((nl = rxBuffer.indexOf('\n')) !== -1) {
+        const line = rxBuffer.slice(0, nl).replace(/\r$/, '');
+        rxBuffer = rxBuffer.slice(nl + 1);
+        handleRxLine(line);
+      }
     });
     status.textContent = 'verbunden';
-    send('MAP');   // Arbeitsraum-Karte anfordern
+    rxBuffer = '';   // Puffer leeren (falls vorherige Verbindung Reste hinterliess)
+    mapRetries = 0;
+    send('MAP');     // Arbeitsraum-Karte anfordern
   } catch (err) {
     status.textContent = 'Fehler: ' + err;
   }

@@ -45,6 +45,30 @@ void BleUart::sendLine(const char* line) {
     String payload = String(line) + "\n";
     txCharacteristic_->setValue(payload);
     txCharacteristic_->notify();
+
+    // Kurze Pause zwischen Notifications. Ohne Pause verliert/verschmilzt Web
+    // Bluetooth (Browser) bei schnellem Versand vieler Zeilen (z.B. der
+    // Arbeitsraum-Karte) einzelne Notifications -> Karte bleibt unvollstaendig.
+    delay(15);
+}
+
+void BleUart::sendChunked(const char* data, size_t len) {
+    if (txCharacteristic_ == nullptr || data == nullptr) {
+        return;
+    }
+    // 180 Byte pro Notification: sicher unter der MTU (247 -> max. 244), aber
+    // auch noch unter 185-3=182, falls der Browser eine kleinere MTU aushandelt.
+    const size_t CHUNK = 180;
+    size_t off = 0;
+    while (off < len) {
+        const size_t n = (len - off) < CHUNK ? (len - off) : CHUNK;
+        txCharacteristic_->setValue((const uint8_t*)(data + off), n);
+        txCharacteristic_->notify();
+        off += n;
+        if (off < len) {
+            delay(10);   // Pacen gegen Web-Bluetooth-Notification-Verlust
+        }
+    }
 }
 
 void BleUart::onWrite(BLECharacteristic* characteristic) {
