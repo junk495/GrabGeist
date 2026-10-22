@@ -77,6 +77,7 @@ let mapComplete = false;
 let rxBuffer = '';    // Roh-Bytes zwischen Notifications puffern
 let mapTimer = null;  // Timeout fuer unvollstaendige Karte
 let mapRetries = 0;   // Anzahl der Neu-Anforderungen
+let lastRawInteract = 0;   // Zeitstempel der letzten manuellen RAW-Slider-Bedienung
 
 function send(line) {
   if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
@@ -129,6 +130,15 @@ function handleRxLine(line) {
     status.textContent = 'Karte empfangen...';
     clearMapTimeout();
     mapTimer = setTimeout(onMapTimeout, 2500);
+  } else if (line.startsWith('PWM ')) {
+    // Servo-Rueckmeldung -> RAW-Slider anzeigen (nicht waehrend der Bedienung).
+    const p = line.split(' ');
+    if (Date.now() - lastRawInteract > 300) {
+      rawLSlider.value = p[1];
+      rawRSlider.value = p[2];
+      document.getElementById('rawLval').textContent = p[1];
+      document.getElementById('rawRval').textContent = p[2];
+    }
   } else if (mapInfo && !mapComplete) {
     if (line.length === 0) return;   // Leerzeilen nicht als Reihe zaehlen
     mapRows.push(line);
@@ -196,8 +206,14 @@ document.querySelectorAll('button[data-cmd]').forEach(b => {
 
 const rawLSlider = document.getElementById('rawL');
 const rawRSlider = document.getElementById('rawR');
-rawLSlider.oninput = () => document.getElementById('rawLval').textContent = rawLSlider.value;
-rawRSlider.oninput = () => document.getElementById('rawRval').textContent = rawRSlider.value;
+rawLSlider.oninput = () => {
+  document.getElementById('rawLval').textContent = rawLSlider.value;
+  lastRawInteract = Date.now();
+};
+rawRSlider.oninput = () => {
+  document.getElementById('rawRval').textContent = rawRSlider.value;
+  lastRawInteract = Date.now();
+};
 function sendRaw() { send(`RAW ${rawLSlider.value} ${rawRSlider.value}`); }
 rawLSlider.onchange = sendRaw;
 rawRSlider.onchange = sendRaw;

@@ -393,6 +393,16 @@ void loop() {
         }
     }
 
+    // Servo-Position an das Handy melden (fuer die RAW-Slider-Anzeige), 5 Hz.
+    static uint32_t lastPwmPush = 0;
+    if (now - lastPwmPush >= 200) {
+        lastPwmPush = now;
+        char pwmBuf[32];
+        snprintf(pwmBuf, sizeof(pwmBuf), "PWM %u %u",
+                 (unsigned)lastPulseL, (unsigned)lastPulseR);
+        ble.sendLine(pwmBuf);
+    }
+
     // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen
     // PWM-Pulsbreiten anzeigen (nicht in jedem 20-ms-Zyklus, damit der Monitor
     // nicht ueberlaeuft).
