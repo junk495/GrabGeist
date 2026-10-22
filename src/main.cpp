@@ -81,10 +81,18 @@ void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
 }
 
 // Karte als einen grossen Textblock senden: statt 75 einzelner Zeilen wird der
-// komplette Text aufgebaut und in wenigen, groesseren Notifications verschickt.
-// Schneller und robuster, weil Web Bluetooth bei vielen kleinen Notifications
-// einzelne Zeilen verliert.
-void sendMapChunked() {
+// Karten-Versand als nicht-blockierende Zustandsmaschine: statt im BLE-Callback
+// mit delay() zu blockieren (blockiert den BLE-Host-Task -> Sende-Credits gehen
+// aus -> Karte bleibt halb), wird hier nur der Text aufgebaut und dann im Loop
+// Chunk fuer Chunk gesendet.
+static volatile bool mapSending = false;
+static std::string mapData;
+static size_t      mapOffset = 0;
+static uint32_t    lastMapChunkMs = 0;
+static const size_t   MAP_CHUNK = 180;
+static const uint32_t MAP_CHUNK_MS = 20;
+
+void startMapSend() {
     std::string out;
     out.reserve(workspace.width() * (workspace.height() + 1) + 64);
 
@@ -102,7 +110,42 @@ void sendMapChunked() {
         out += '\n';
     }
 
-    ble.sendChunked(out.c_str(), out.size());
+    mapData = std::move(out);
+    mapOffset = 0;
+    mapSending = true;
+    lastMapChunkMs = millis();
+}
+
+// Einen Chunk senden (vom Loop aufgerufen; sendChunked mit <=180 Byte sendet
+// genau eine Notification ohne delay()).
+void updateMapSend() {
+    if (!mapSending) {
+        return;
+    }
+    if (millis() - lastMapChunkMs < MAP_CHUNK_MS) {
+        return;
+    }
+
+    const size_t remaining = mapData.size() - mapOffset;
+    const size_t n = remaining < MAP_CHUNK ? remaining : MAP_CHUNK;
+    ble.sendChunked(mapData.data() + mapOffset, n);
+    mapOffset += n;
+    lastMapChunkMs = millis();
+
+    if (mapOffset >= mapData.size()) {
+        mapSending = false;
+    }
+}
+
+// Aktuelle Servo-Pulsbreiten an das Handy melden (nach abgeschlossenem Wechsel).
+void sendPositionUpdate() {
+    if (mapSending) {
+        return;   // nicht in den Kartentransfer interleaven
+    }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "PWM %u %u",
+             (unsigned)lastPulseL, (unsigned)lastPulseR);
+    ble.sendLine(buf);
 }
 
 // Zuletzt gueltige Kurbelwinkel (Hysterese-Hint fuer die bimodale IK).
@@ -324,16 +367,20 @@ void handleLine(const char* line) {
             break;
 
         case Command::Type::STATUS: {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "POS %.1f %.1f %s",
+            if (mapSending) {
+                break;   // Karte wird gesendet -> keine Status-Antwort (Interleaving vermeiden)
+            }
+            char buf[80];
+            snprintf(buf, sizeof(buf), "POS %.1f %.1f %s %u %u",
                      planner.x(), planner.y(),
-                     planner.isMoving() ? "moving" : "idle");
+                     planner.isMoving() ? "moving" : "idle",
+                     (unsigned)lastPulseL, (unsigned)lastPulseR);
             ble.sendLine(buf);
             break;
         }
 
         case Command::Type::MAP:
-            sendMapChunked();
+            startMapSend();
             break;
 
         default:
@@ -393,14 +440,19 @@ void loop() {
         }
     }
 
-    // Servo-Position an das Handy melden (fuer die RAW-Slider-Anzeige), 5 Hz.
-    static uint32_t lastPwmPush = 0;
-    if (now - lastPwmPush >= 200) {
-        lastPwmPush = now;
-        char pwmBuf[32];
-        snprintf(pwmBuf, sizeof(pwmBuf), "PWM %u %u",
-                 (unsigned)lastPulseL, (unsigned)lastPulseR);
-        ble.sendLine(pwmBuf);
+    // Karten-Chunks senden (nicht-blockierend).
+    updateMapSend();
+
+    // Nach abgeschlossenem Positionswechsel die neue Servo-Position melden.
+    static uint16_t prevPulseL = 0, prevPulseR = 0;
+    static bool     settled = false;
+    if (lastPulseL != prevPulseL || lastPulseR != prevPulseR) {
+        prevPulseL = lastPulseL;
+        prevPulseR = lastPulseR;
+        settled = false;
+    } else if (!settled) {
+        settled = true;
+        sendPositionUpdate();
     }
 
     // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen

@@ -47,6 +47,9 @@
 <div>
   <h3>Direkte Servo-Steuerung (RAW, voller 270&deg;-Bereich)</h3>
   <div class="row">
+    <label><input type="checkbox" id="showPos" checked> Position anzeigen</label>
+  </div>
+  <div class="row">
     <label>Servo L (&micro;s): <input type="range" id="rawL" min="500" max="2500" value="1500" step="10"></label>
     <span id="rawLval">1500</span>
   </div>
@@ -131,9 +134,10 @@ function handleRxLine(line) {
     clearMapTimeout();
     mapTimer = setTimeout(onMapTimeout, 2500);
   } else if (line.startsWith('PWM ')) {
-    // Servo-Rueckmeldung -> RAW-Slider anzeigen (nicht waehrend der Bedienung).
+    // Servo-Rueckmeldung (nach abgeschlossenem Wechsel) -> RAW-Slider aktualisieren.
+    // Nur wenn die Anzeige aktiviert ist und nicht gerade manuell bedient wird.
     const p = line.split(' ');
-    if (Date.now() - lastRawInteract > 300) {
+    if (showPos.checked && Date.now() - lastRawInteract > 300) {
       rawLSlider.value = p[1];
       rawRSlider.value = p[2];
       document.getElementById('rawLval').textContent = p[1];
@@ -206,6 +210,7 @@ document.querySelectorAll('button[data-cmd]').forEach(b => {
 
 const rawLSlider = document.getElementById('rawL');
 const rawRSlider = document.getElementById('rawR');
+const showPos = document.getElementById('showPos');
 rawLSlider.oninput = () => {
   document.getElementById('rawLval').textContent = rawLSlider.value;
   lastRawInteract = Date.now();
