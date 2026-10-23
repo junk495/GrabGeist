@@ -14,6 +14,7 @@
 #include <string>
 
 #include "BleUart.h"
+#include "ResetLog.h"
 
 // ---------------------------------------------------------------------------
 // Pinbelegung (ANNAHME — an deinen Aufbau anpassen!)
@@ -50,6 +51,7 @@ static MotionPlanner   planner;
 static ServoController servos;
 static BleUart         ble;
 static Workspace       workspace;
+static ResetLog        resetLog;
 
 // Zuletzt an die Servo-Pins ausgegebene PWM-Pulsbreiten (fuer die Monitor-Ausgabe).
 static uint16_t lastPulseL = 0;
@@ -292,6 +294,14 @@ void sendMap() {
 }
 
 void handleLine(const char* line) {
+    // Beim ersten Befehl nach einem Boot die Reset-Diagnose automatisch melden,
+    // damit sie im Test-GUI sichtbar wird, ohne einen Monitor anschliessen zu muessen.
+    static bool sentResetLog = false;
+    if (!sentResetLog) {
+        sentResetLog = true;
+        ble.sendLine(resetLog.format().c_str());
+    }
+
     Command cmd;
     if (!CommandParser::parse(line, cmd)) {
         ble.sendLine("ERR unknown");
@@ -383,6 +393,10 @@ void handleLine(const char* line) {
             startMapSend();
             break;
 
+        case Command::Type::RESETLOG:
+            ble.sendLine(resetLog.format().c_str());
+            break;
+
         default:
             break;
     }
@@ -390,7 +404,11 @@ void handleLine(const char* line) {
 
 // ---------------------------------------------------------------------------
 void setup() {
+    resetLog.recordBoot();   // Reset-Grund persistent in NVS aufzeichnen (als Erstes)
+
     Serial.begin(115200);
+    Serial.printf("Reset-Grund: %s (boot=%u)\n",
+                  resetLog.lastReasonText().c_str(), resetLog.bootCount());
 
     // Servo-Kalibrierung (am Aufbau ermittelt):
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):

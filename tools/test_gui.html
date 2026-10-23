@@ -20,6 +20,8 @@
 
 <button id="connect">Verbinden</button>
 <span id="status">nicht verbunden</span>
+<button id="resetlog" style="margin-left:12px">Reset-Log</button>
+<p id="resetInfo" class="hint"></p>
 
 <hr>
 <canvas id="map" width="89" height="74"></canvas>
@@ -71,6 +73,7 @@ let rxChar = null;
 let txChar = null;
 
 const status = document.getElementById('status');
+const resetInfo = document.getElementById('resetInfo');
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 
@@ -143,6 +146,9 @@ function handleRxLine(line) {
       document.getElementById('rawLval').textContent = p[1];
       document.getElementById('rawRval').textContent = p[2];
     }
+  } else if (line.startsWith('RST ')) {
+    // Reset-Diagnose anzeigen (kommt automatisch nach dem Verbinden oder auf "Reset-Log").
+    resetInfo.textContent = 'Reset: ' + line.slice(4);
   } else if (mapInfo && !mapComplete) {
     if (line.length === 0) return;   // Leerzeilen nicht als Reihe zaehlen
     mapRows.push(line);
@@ -202,6 +208,7 @@ async function connect() {
 }
 
 document.getElementById('connect').onclick = connect;
+document.getElementById('resetlog').onclick = () => send('RESETLOG');
 document.getElementById('stop').onclick = () => send('STOP');
 document.getElementById('auto').onclick = () => send('AUTO');
 document.querySelectorAll('button[data-cmd]').forEach(b => {

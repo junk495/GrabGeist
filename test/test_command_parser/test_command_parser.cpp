@@ -91,6 +91,14 @@ void test_auto(void) {
     TEST_ASSERT_TRUE(c.type == Command::Type::AUTO);
 }
 
+void test_resetlog(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("RESETLOG", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::RESETLOG);
+    TEST_ASSERT_TRUE(CommandParser::parse("resetlog", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::RESETLOG);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -103,5 +111,6 @@ int main(void) {
     RUN_TEST(test_raw);
     RUN_TEST(test_raw_clamp);
     RUN_TEST(test_auto);
+    RUN_TEST(test_resetlog);
     return UNITY_END();
 }

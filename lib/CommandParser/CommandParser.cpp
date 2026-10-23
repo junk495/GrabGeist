@@ -112,5 +112,10 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "RESETLOG")) {
+        out.type = Command::Type::RESETLOG;
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }
