@@ -14,8 +14,11 @@ class Workspace {
 public:
     // Raster: X/Y-Bereich und Schrittweite (mm).
     // step = 5 mm ist ein guter Kompromiss aus Aufloesung und ESP32-RAM.
+    // clearanceMm = zusaetzlicher Sicherheitsabstand zu Hindernissen (Sperrzone),
+    // um den die gueltige Flaeche bei der Pfadplanung eingeschrumpft wird.
     Workspace(float xMin = -220.0f, float xMax = 220.0f,
-              float yMin = -150.0f, float yMax = 215.0f, float step = 5.0f);
+              float yMin = -150.0f, float yMax = 215.0f, float step = 5.0f,
+              float clearanceMm = 10.0f);
 
     // Karte berechnen (einmalig beim Start; nutzt Kinematics::isReachable).
     void generate();
@@ -49,8 +52,10 @@ private:
     bool lineClear(int cx0, int cy0, int cx1, int cy1) const;
     float heuristic(int cx, int cy, int ex, int ey) const;
     bool aStar(int sCx, int sCy, int eCx, int eCy, std::vector<Point>& waypoints) const;
+    void applyClearance();
 
     float xMin_, xMax_, yMin_, yMax_, step_;
+    float clearanceMm_;
     int width_ = 0;
     int height_ = 0;
     std::vector<uint8_t> grid_;

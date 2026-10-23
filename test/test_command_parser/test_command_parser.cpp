@@ -114,6 +114,39 @@ void test_ramp(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 1000.0f, c.ramp);
 }
 
+void test_random(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("RANDOM", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::RANDOM);
+    TEST_ASSERT_TRUE(CommandParser::parse("random", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::RANDOM);
+}
+
+void test_rec_play(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("REC", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::REC);
+    TEST_ASSERT_TRUE(CommandParser::parse("PLAY", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::PLAY);
+    TEST_ASSERT_TRUE(CommandParser::parse("play", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::PLAY);
+}
+
+void test_script_commands(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("DELAY 1200", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::DELAY);
+    TEST_ASSERT_EQUAL_UINT32(1200, c.delayMs);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("WAIT", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::WAIT);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("RUN", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::RUN);
+    TEST_ASSERT_TRUE(CommandParser::parse("run", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::RUN);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -128,5 +161,8 @@ int main(void) {
     RUN_TEST(test_auto);
     RUN_TEST(test_resetlog);
     RUN_TEST(test_ramp);
+    RUN_TEST(test_random);
+    RUN_TEST(test_rec_play);
+    RUN_TEST(test_script_commands);
     return UNITY_END();
 }

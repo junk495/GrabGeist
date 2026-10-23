@@ -126,5 +126,39 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "RANDOM")) {
+        out.type = Command::Type::RANDOM;
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "REC")) {
+        out.type = Command::Type::REC;
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "PLAY")) {
+        out.type = Command::Type::PLAY;
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "DELAY")) {
+        out.type = Command::Type::DELAY;
+        char* ms = std::strtok(nullptr, " \t\r\n");
+        if (ms != nullptr) {
+            out.delayMs = static_cast<uint32_t>(std::strtoul(ms, nullptr, 10));
+        }
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "WAIT")) {
+        out.type = Command::Type::WAIT;
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "RUN")) {
+        out.type = Command::Type::RUN;
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }

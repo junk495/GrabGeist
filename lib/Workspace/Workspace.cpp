@@ -9,8 +9,8 @@
 #include <queue>
 #include <utility>
 
-Workspace::Workspace(float xMin, float xMax, float yMin, float yMax, float step)
-    : xMin_(xMin), xMax_(xMax), yMin_(yMin), yMax_(yMax), step_(step) {
+Workspace::Workspace(float xMin, float xMax, float yMin, float yMax, float step, float clearanceMm)
+    : xMin_(xMin), xMax_(xMax), yMin_(yMin), yMax_(yMax), step_(step), clearanceMm_(clearanceMm) {
     width_ = static_cast<int>(std::round((xMax_ - xMin_) / step_)) + 1;
     height_ = static_cast<int>(std::round((yMax_ - yMin_) / step_)) + 1;
     grid_.assign(static_cast<size_t>(width_ * height_), 0);
@@ -22,6 +22,29 @@ void Workspace::generate() {
         for (int cx = 0; cx < width_; ++cx) {
             const float x = toX(cx);
             grid_[index(cx, cy)] = Kinematics::isReachable(x, y) ? 1 : 0;
+        }
+    }
+    applyClearance();
+}
+
+// Die zentrale Sperrzone (Servogehaeuse) um clearanceMm aufweiten, damit Pfade
+// (z.B. von der rechten zur linken unteren Tasche) nicht zu dicht daran vorbei
+// gefuehrt werden. Die uebrigen Arbeitsraumgrenzen bleiben unveraendert.
+void Workspace::applyClearance() {
+    const float x0 = Kinematics::SERVO_BOX_X_MIN - clearanceMm_;
+    const float x1 = Kinematics::SERVO_BOX_X_MAX + clearanceMm_;
+    const float y0 = Kinematics::SERVO_BOX_Y_MIN - clearanceMm_;
+    const float y1 = Kinematics::SERVO_BOX_Y_MAX + clearanceMm_;
+    for (int cy = 0; cy < height_; ++cy) {
+        const float y = toY(cy);
+        if (y < y0 || y > y1) {
+            continue;
+        }
+        for (int cx = 0; cx < width_; ++cx) {
+            const float x = toX(cx);
+            if (x >= x0 && x <= x1) {
+                grid_[index(cx, cy)] = 0;
+            }
         }
     }
 }
@@ -202,8 +225,28 @@ bool Workspace::aStar(int sCx, int sCy, int eCx, int eCy, std::vector<Point>& wa
                 cur = cameFrom[cur];
             }
             std::reverse(cells.begin(), cells.end());
+
+            // Pfad vereinfachen: ueberfluessige Zwischenpunkte entfernen, solange
+            // die direkte Verbindung frei bleibt (weniger/laengere Segmente).
+            std::vector<int> simple;
+            simple.push_back(cells.front());
+            size_t i = 0;
+            while (i + 1 < cells.size()) {
+                size_t j = cells.size() - 1;
+                while (j > i + 1) {
+                    const int a = cells[i];
+                    const int b = cells[j];
+                    if (lineClear(a % width_, a / width_, b % width_, b / width_)) {
+                        break;
+                    }
+                    --j;
+                }
+                simple.push_back(cells[j]);
+                i = j;
+            }
+
             waypoints.clear();
-            for (int c : cells) {
+            for (int c : simple) {
                 waypoints.push_back({toX(c % width_), toY(c / width_)});
             }
             return true;

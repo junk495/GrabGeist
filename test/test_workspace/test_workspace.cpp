@@ -61,11 +61,30 @@ void test_findpath_around_center(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, -40.0f, waypoints.back().y);
 }
 
+// Clearance + Vereinfachung: der Weg um die Sperrzone ist kurz und haelt Abstand.
+void test_findpath_clearance(void) {
+    Workspace ws = makeWorkspace();
+    std::vector<Point> waypoints;
+    TEST_ASSERT_TRUE(ws.findPath(-120.0f, -40.0f, 120.0f, -40.0f, waypoints));
+    // Vereinfacht: deutlich weniger Punkte als die rohe Zellkette.
+    TEST_ASSERT_TRUE(waypoints.size() >= 2);
+    TEST_ASSERT_TRUE(waypoints.size() <= 20);
+    for (const Point& p : waypoints) {
+        TEST_ASSERT_TRUE(ws.isValid(p.x, p.y));
+        // Im Y-Band der Sperrzone muss der Pfad seitlich genug Abstand halten
+        // (Clearance 10 mm auf 10-mm-Raster -> |x| >= 60 statt |x| >= 45).
+        if (p.y > -60.0f && p.y < 20.0f) {
+            TEST_ASSERT_TRUE(p.x <= -60.0f || p.x >= 60.0f);
+        }
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_generate_query);
     RUN_TEST(test_nearest_valid);
     RUN_TEST(test_findpath_direct);
     RUN_TEST(test_findpath_around_center);
+    RUN_TEST(test_findpath_clearance);
     return UNITY_END();
 }

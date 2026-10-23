@@ -43,7 +43,24 @@
 <hr>
 <div>
   <button id="auto">AUTO (Ablauf)</button>
+  <button id="random">Zufall</button>
   <span class="hint">links &rarr; oben &rarr; rechts &rarr; versteckt &middot; 1 s / 2 s</span>
+</div>
+
+<hr>
+<div>
+  <button id="rec">Aufnahme</button>
+  <button id="play">Abspielen</button>
+  <span class="hint">Aufnahme: bewegen &middot; Abspielen: Schleife &middot; STOP beendet alles</span>
+</div>
+
+<hr>
+<div>
+  <h3>Script (Ablauf-Datei)</h3>
+  <input type="file" id="scriptFile" accept=".txt">
+  <button id="scriptUpload">Hochladen</button>
+  <button id="run">Abspielen</button>
+  <p class="hint">Zeilen: PEEK / MOVE / RAW / DELAY &lt;ms&gt; / WAIT / #Kommentar &middot; STOP beendet</p>
 </div>
 
 <hr>
@@ -167,6 +184,16 @@ function handleRxLine(line) {
     const v = Math.round(+line.split(' ')[1]);
     rampSlider.value = v;
     rampVal.textContent = v;
+  } else if (line.startsWith('RANDOM ')) {
+    status.textContent = line;
+  } else if (line.startsWith('REC ')) {
+    status.textContent = line;
+  } else if (line.startsWith('PLAY ')) {
+    status.textContent = line;
+  } else if (line.startsWith('SCRIPT ')) {
+    status.textContent = line;
+  } else if (line.startsWith('RUN ')) {
+    status.textContent = line;
   } else if (line.startsWith('ERR ')) {
     resetInfo.textContent = 'Fehler: ' + line.slice(4) +
       ' (Befehl nicht erkannt? Dann ist auf dem ESP32 noch die alte Firmware - neu flashen.)';
@@ -244,6 +271,29 @@ document.getElementById('rampReset').onclick = () => {
   send('RAMP 750');
 };
 document.getElementById('auto').onclick = () => send('AUTO');
+document.getElementById('random').onclick = () => send('RANDOM');
+document.getElementById('rec').onclick = () => send('REC');
+document.getElementById('play').onclick = () => send('PLAY');
+document.getElementById('run').onclick = () => send('RUN');
+
+function uploadScript() {
+  const file = document.getElementById('scriptFile').files[0];
+  if (!file) { status.textContent = 'Erst Datei wählen'; return; }
+  if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lines = String(reader.result).split(/\r?\n/);
+    status.textContent = 'Script wird gesendet...';
+    send('SCRIPT_CLEAR');
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.length > 0) send(line);
+    }
+    send('SCRIPT_END');
+  };
+  reader.readAsText(file);
+}
+document.getElementById('scriptUpload').onclick = uploadScript;
 document.querySelectorAll('button[data-cmd]').forEach(b => {
   b.onclick = () => send(b.dataset.cmd);
 });

@@ -18,7 +18,8 @@ public:
     static constexpr float kPi = 3.14159265358979323846f;
 
     // Konfiguration
-    void setDuration(float seconds);   // Dauer je Segment (SMOOTH)
+    void setDuration(float seconds);   // Dauer fuer moveTo (Einzelziel, SMOOTH)
+    void setSpeed(float mmPerSec);     // Geschwindigkeit fuer moveAlongPath (SMOOTH) [mm/s]
     void setEasing(Easing easing);
 
     // Aktuelle Position setzen (ohne Bewegung, z.B. beim Start/Homing)
@@ -43,12 +44,14 @@ public:
 private:
     float ease(float t) const;   // t in [0,1] -> [0,1]
 
-    std::vector<Point> path_;    // Wegpunkte (inkl. Start)
-    size_t seg_ = 0;             // aktuelles Segment path_[seg_] -> path_[seg_+1]
+    std::vector<Point> path_;     // Wegpunkte (inkl. Start)
+    std::vector<float> segDuration_;  // Dauer je Segment [s]
+    size_t seg_ = 0;              // aktuelles Segment path_[seg_] -> path_[seg_+1]
     float currentX_ = 0.0f;
     float currentY_ = 0.0f;
     float elapsed_ = 0.0f;
-    float duration_ = 1.0f;
+    float duration_ = 1.0f;       // Einzelziel-Dauer (moveTo)
+    float speed_ = 150.0f;        // Bahngeschwindigkeit fuer Wegpunkt-Pfade [mm/s]
     Easing easing_ = Easing::COSINE;
     bool  moving_ = false;
 };

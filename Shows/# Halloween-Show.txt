@@ -1,0 +1,11 @@
+# Halloween-Show
+PEEK hide
+DELAY 2000
+PEEK left
+DELAY 1200
+PEEK hide
+DELAY 800
+PEEK right
+DELAY 1200
+PEEK hide
+DELAY 1500

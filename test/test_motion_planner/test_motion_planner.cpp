@@ -107,31 +107,49 @@ void test_idle_update(void) {
     TEST_ASSERT_EQUAL_FLOAT(0.0f, mp.y());
 }
 
-// Wegpunkt-Folge (A*-Pfad): wird Segment fuer Segment abgefahren.
+// Wegpunkt-Folge (A*-Pfad): konstante Bahngeschwindigkeit (setSpeed), Segment fuer Segment.
 void test_move_along_path_smooth(void) {
     MotionPlanner mp;
     mp.setEasing(MotionPlanner::Easing::LINEAR);
-    mp.setDuration(1.0f);
+    mp.setSpeed(100.0f);   // 100 mm/s
     std::vector<Point> path = {{0.0f, 0.0f}, {50.0f, 0.0f}, {50.0f, 50.0f}};
     mp.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
     TEST_ASSERT_TRUE(mp.isMoving());
 
-    mp.update(0.5f);   // halbes Segment 1
+    // Segment 1: 50 mm @ 100 mm/s = 0,5 s
+    mp.update(0.25f);   // halbes Segment 1
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 25.0f, mp.x());
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, mp.y());
 
-    mp.update(0.5f);   // Segment 1 fertig
+    mp.update(0.25f);   // Segment 1 fertig
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, mp.y());
     TEST_ASSERT_TRUE(mp.isMoving());
 
-    mp.update(0.5f);   // halbes Segment 2
+    mp.update(0.25f);   // halbes Segment 2
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 25.0f, mp.y());
 
-    mp.update(0.5f);   // fertig
+    mp.update(0.25f);   // fertig
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.x());
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, mp.y());
+    TEST_ASSERT_FALSE(mp.isMoving());
+}
+
+// Geschwindigkeit bestimmt die Segmentdauer (laengere Strecke = laengere Dauer).
+void test_speed(void) {
+    MotionPlanner mp;
+    mp.setEasing(MotionPlanner::Easing::LINEAR);
+    mp.setSpeed(200.0f);   // 200 mm/s
+    std::vector<Point> path = {{0.0f, 0.0f}, {200.0f, 0.0f}};
+    mp.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
+
+    mp.update(0.5f);   // 100 mm bei 200 mm/s
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 100.0f, mp.x());
+    TEST_ASSERT_TRUE(mp.isMoving());
+
+    mp.update(0.5f);   // fertig
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 200.0f, mp.x());
     TEST_ASSERT_FALSE(mp.isMoving());
 }
 
@@ -156,5 +174,6 @@ int main(void) {
     RUN_TEST(test_idle_update);
     RUN_TEST(test_move_along_path_smooth);
     RUN_TEST(test_move_along_path_snap);
+    RUN_TEST(test_speed);
     return UNITY_END();
 }

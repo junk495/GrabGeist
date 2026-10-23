@@ -4,6 +4,7 @@
 //   BLE -> CommandParser -> MotionPlanner -> Kinematics -> ServoController -> LEDC
 
 #include <Arduino.h>
+#include <esp_random.h>   // esp_random() fuer den Zufallsmodus
 
 #include <CommandParser.h>
 #include <Kinematics.h>
@@ -11,13 +12,15 @@
 #include <ServoController.h>
 #include <Workspace.h>
 
+#include <cstring>
 #include <string>
+#include <vector>
 
 #include "BleUart.h"
 #include "ResetLog.h"
 
 // ---------------------------------------------------------------------------
-// Pinbelegung (ANNAHME — an deinen Aufbau anpassen!)
+// Pinbelegung (am Modell verifiziert).
 // GPIOs ohne Konflikt mit Boot-Strapping-/Flash-/PSRAM-/UART0-/USB-Belegung.
 // ---------------------------------------------------------------------------
 static const uint8_t PIN_SERVO_LEFT  = 4;
@@ -46,12 +49,12 @@ static constexpr float SERVO_RAMP_US_PER_S_DEFAULT = 750.0f;
 static float servoRampUsPerS = SERVO_RAMP_US_PER_S_DEFAULT;
 
 // ---------------------------------------------------------------------------
-// Preset-Koordinaten (ANPASSEN, sobald die Mechanik aus Fusion steht!)
+// Preset-Koordinaten (am Modell verifiziert).
 // ---------------------------------------------------------------------------
 static const float POS_LEFT_X  = -50.0f, POS_LEFT_Y  = 150.0f;
 static const float POS_RIGHT_X = 50.0f,  POS_RIGHT_Y = 150.0f;
 
-// "Versteckt" als direkte Servo-Position (am Aufbau ermittelt).
+// "Versteckt" als direkte Servo-Position (am Modell verifiziert).
 // Kollisionsgrenze: tiefer (= Kurbeln weiter aussen) beruehren sich die Arme.
 static const uint16_t HIDE_PULSE_L = 1580;
 static const uint16_t HIDE_PULSE_R = 1410;
@@ -87,6 +90,52 @@ static bool     autoMoving = false;      // true = Uebergang, false = Halten
 static uint32_t autoPhaseStart = 0;
 static uint16_t autoStartL = 0, autoStartR = 0;
 static uint16_t autoTargetL = 0, autoTargetR = 0;
+
+// ---------------------------------------------------------------------------
+// Zufallsmodus: zufaellig hervor- und zurueckschauen (Versteckt / Links / Rechts / Oben).
+// ---------------------------------------------------------------------------
+static const uint32_t RANDOM_PEEK_HOLD_MIN_MS = 800;
+static const uint32_t RANDOM_PEEK_HOLD_MAX_MS = 2500;
+static const uint32_t RANDOM_HIDE_HOLD_MIN_MS = 1500;
+static const uint32_t RANDOM_HIDE_HOLD_MAX_MS = 5000;
+
+enum class RandomStage { PEEK_MOVE, PEEK_HOLD, HIDE_MOVE, HIDE_HOLD };
+
+static bool        randomActive = false;
+static RandomStage randomStage = RandomStage::HIDE_HOLD;
+static uint32_t    randomStageStart = 0;
+static uint32_t    randomHoldMs = 0;
+
+// ---------------------------------------------------------------------------
+// Record/Playback: Servo-Zielpulsbreiten aufnehmen und als Schleife abspielen.
+// ---------------------------------------------------------------------------
+static const uint32_t REC_INTERVAL_MS = 50;      // 20 Hz Abtastrate
+static const size_t   REC_MAX_SAMPLES = 1200;    // 60 s @ 20 Hz
+
+static uint16_t recPulseL[REC_MAX_SAMPLES];
+static uint16_t recPulseR[REC_MAX_SAMPLES];
+static size_t   recCount = 0;
+static bool     recActive = false;
+static uint32_t lastRecMs = 0;
+
+static bool     playbackActive = false;
+static size_t   playbackIndex = 0;
+static uint32_t lastPlaybackMs = 0;
+
+// ---------------------------------------------------------------------------
+// Script: Text-Ablauf (eine Zeile = ein Befehl), vom PC hochgeladen, als Schleife abspielbar.
+// ---------------------------------------------------------------------------
+static const size_t SCRIPT_MAX_LINES = 200;
+
+static std::vector<std::string> scriptLines;
+static bool   scriptLoading = false;
+static bool   scriptActive = false;
+static size_t scriptIndex = 0;
+
+enum class ScriptWait { NONE, DELAY, ARRIVAL };
+static ScriptWait scriptWait = ScriptWait::NONE;
+static uint32_t   scriptWaitStart = 0;
+static uint32_t   scriptWaitMs = 0;
 
 // ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
@@ -274,6 +323,9 @@ bool autoTargetPulses(int step, uint16_t& pulseL, uint16_t& pulseR) {
 
 void startAutoMode() {
     autoActive = true;
+    randomActive = false;
+    playbackActive = false;
+    scriptActive = false;
     autoStep = 0;
     if (!autoTargetPulses(autoStep, autoTargetL, autoTargetR)) {
         autoTargetL = HIDE_PULSE_L;
@@ -318,6 +370,138 @@ void updateAutoMode() {
 }
 
 // ---------------------------------------------------------------------------
+// Zufallsmodus (nicht-blockierend, wird in loop() aufgerufen).
+// ---------------------------------------------------------------------------
+static uint32_t randBetween(uint32_t minIncl, uint32_t maxExcl) {
+    if (maxExcl <= minIncl) {
+        return minIncl;
+    }
+    return minIncl + (esp_random() % (maxExcl - minIncl));
+}
+
+// Zufaellige Peek-Position waehlen (links / rechts / oben).
+static void randomPeekPulses(uint16_t& pulseL, uint16_t& pulseR) {
+    const uint32_t pick = randBetween(0, 3);
+    if (pick == 0 && ikPulses(POS_LEFT_X, POS_LEFT_Y, pulseL, pulseR)) {
+        return;
+    }
+    if (pick == 1 && ikPulses(POS_RIGHT_X, POS_RIGHT_Y, pulseL, pulseR)) {
+        return;
+    }
+    // Oben (beide Kurbeln senkrecht) als Standard/Fallback.
+    pulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
+    pulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
+}
+
+void startRandomMode() {
+    randomActive = true;
+    autoActive = false;
+    playbackActive = false;
+    scriptActive = false;
+    directMode = false;
+    randomStage = RandomStage::HIDE_MOVE;   // erst verstecken, dann loslegen
+    randomStageStart = millis();
+    setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);
+}
+
+void updateRandomMode() {
+    const uint32_t now = millis();
+    switch (randomStage) {
+        case RandomStage::PEEK_MOVE:
+            // Warten, bis die Rampe das Ziel erreicht hat.
+            if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
+                randomHoldMs = randBetween(RANDOM_PEEK_HOLD_MIN_MS, RANDOM_PEEK_HOLD_MAX_MS);
+                randomStage = RandomStage::PEEK_HOLD;
+                randomStageStart = now;
+            }
+            break;
+
+        case RandomStage::PEEK_HOLD:
+            if (now - randomStageStart >= randomHoldMs) {
+                setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);
+                randomStage = RandomStage::HIDE_MOVE;
+            }
+            break;
+
+        case RandomStage::HIDE_MOVE:
+            if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
+                randomHoldMs = randBetween(RANDOM_HIDE_HOLD_MIN_MS, RANDOM_HIDE_HOLD_MAX_MS);
+                randomStage = RandomStage::HIDE_HOLD;
+                randomStageStart = now;
+            }
+            break;
+
+        case RandomStage::HIDE_HOLD:
+            if (now - randomStageStart >= randomHoldMs) {
+                uint16_t pl, pr;
+                randomPeekPulses(pl, pr);
+                setTargetPulses(pl, pr);
+                randomStage = RandomStage::PEEK_MOVE;
+            }
+            break;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Record/Playback (nicht-blockierend).
+// ---------------------------------------------------------------------------
+void startRecording() {
+    recCount = 0;
+    recActive = true;
+    lastRecMs = 0;
+    playbackActive = false;   // nicht waehrend der Wiedergabe aufnehmen
+}
+
+void updateRecording() {
+    if (!recActive) {
+        return;
+    }
+    const uint32_t now = millis();
+    if (now - lastRecMs < REC_INTERVAL_MS) {
+        return;
+    }
+    lastRecMs = now;
+
+    if (recCount >= REC_MAX_SAMPLES) {
+        recActive = false;
+        if (!mapSending) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "REC full %u", (unsigned)recCount);
+            ble.sendLine(buf);
+        }
+        return;
+    }
+
+    recPulseL[recCount] = desiredPulseL;
+    recPulseR[recCount] = desiredPulseR;
+    ++recCount;
+}
+
+void startPlayback() {
+    if (recCount == 0) {
+        return;
+    }
+    playbackActive = true;
+    playbackIndex = 0;
+    lastPlaybackMs = 0;
+    recActive = false;
+    autoActive = false;
+    randomActive = false;
+    scriptActive = false;
+    directMode = false;
+}
+
+void updatePlayback() {
+    const uint32_t now = millis();
+    if (now - lastPlaybackMs < REC_INTERVAL_MS) {
+        return;
+    }
+    lastPlaybackMs = now;
+    setTargetPulses(recPulseL[playbackIndex], recPulseR[playbackIndex]);
+    playbackIndex = (playbackIndex + 1) % recCount;   // als Schleife wiederholen
+}
+
+// ---------------------------------------------------------------------------
 // BLE-Empfang: eine Zeile -> Befehl parsen und ausfuehren.
 // (Wird aus dem BLE-Kontext aufgerufen; fuer den Testbetrieb reicht das.)
 // ---------------------------------------------------------------------------
@@ -344,6 +528,143 @@ void sendMap() {
     ble.sendLine("MAP_DONE");
 }
 
+// ---------------------------------------------------------------------------
+// Befehle ausfuehren (ohne BLE-Antwort) - von handleLine UND vom Script benutzt.
+// ---------------------------------------------------------------------------
+void doMoveCommand(float x, float y, bool snap) {
+    autoActive = false;
+    randomActive = false;
+    playbackActive = false;
+    directMode = false;
+
+    // Ziel auf den naechsten gueltigen Punkt snappen
+    float tx = x, ty = y;
+    workspace.nearestValid(x, y, tx, ty);
+
+    if (snap) {
+        planner.moveTo(tx, ty, MotionPlanner::MoveType::SNAP);
+    } else {
+        // Pfad vom aktuellen Punkt (ggf. gesnappt) zum Ziel (A* um die Sperrzone)
+        float sx = planner.x(), sy = planner.y();
+        workspace.nearestValid(sx, sy, sx, sy);
+        std::vector<Point> path;
+        if (workspace.findPath(sx, sy, tx, ty, path)) {
+            planner.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
+        } else {
+            planner.moveTo(tx, ty, MotionPlanner::MoveType::SMOOTH);
+        }
+    }
+}
+
+void doPeekCommand(Command::Peek peek) {
+    autoActive = false;
+    randomActive = false;
+    playbackActive = false;
+    directMode = false;
+    switch (peek) {
+        case Command::Peek::LEFT:
+            planner.moveTo(POS_LEFT_X, POS_LEFT_Y, MotionPlanner::MoveType::SMOOTH);
+            break;
+        case Command::Peek::RIGHT:
+            planner.moveTo(POS_RIGHT_X, POS_RIGHT_Y, MotionPlanner::MoveType::SMOOTH);
+            break;
+        case Command::Peek::TOP:
+            // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
+            setServoDirect(servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f)),
+                           servos.angleToPulseUsRight(Kinematics::degToRad(90.0f)));
+            break;
+        case Command::Peek::HIDE:
+            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+            break;
+    }
+}
+
+void doRawCommand(uint16_t pulseL, uint16_t pulseR) {
+    autoActive = false;
+    randomActive = false;
+    playbackActive = false;
+    setServoDirect(pulseL, pulseR);
+}
+
+// ---------------------------------------------------------------------------
+// Script (nicht-blockierend): Zeile fuer Zeile ausfuehren, als Schleife.
+// ---------------------------------------------------------------------------
+void startScript() {
+    scriptActive = true;
+    scriptIndex = 0;
+    scriptWait = ScriptWait::NONE;
+    autoActive = false;
+    randomActive = false;
+    playbackActive = false;
+    recActive = false;
+    directMode = false;
+}
+
+void updateScript() {
+    if (!scriptActive) {
+        return;
+    }
+    const uint32_t now = millis();
+
+    if (scriptWait == ScriptWait::DELAY) {
+        if (now - scriptWaitStart < scriptWaitMs) {
+            return;
+        }
+        scriptWait = ScriptWait::NONE;
+    } else if (scriptWait == ScriptWait::ARRIVAL) {
+        if (outputPulseL != desiredPulseL || outputPulseR != desiredPulseR) {
+            return;
+        }
+        scriptWait = ScriptWait::NONE;
+    }
+
+    while (scriptIndex < scriptLines.size()) {
+        const std::string& line = scriptLines[scriptIndex++];
+
+        // Kommentare (#) und Leerzeilen ueberspringen.
+        const char* s = line.c_str();
+        while (*s == ' ' || *s == '\t') {
+            ++s;
+        }
+        if (*s == '\0' || *s == '#') {
+            continue;
+        }
+
+        Command cmd;
+        if (!CommandParser::parse(line.c_str(), cmd)) {
+            continue;   // unbekannte Zeile ignorieren
+        }
+
+        switch (cmd.type) {
+            case Command::Type::DELAY:
+                scriptWaitMs = cmd.delayMs;
+                scriptWaitStart = now;
+                scriptWait = ScriptWait::DELAY;
+                return;
+            case Command::Type::WAIT:
+                scriptWait = ScriptWait::ARRIVAL;
+                return;
+            case Command::Type::MOVE:
+                doMoveCommand(cmd.x, cmd.y, cmd.snap);
+                scriptWait = ScriptWait::ARRIVAL;   // Bewegung abwarten
+                return;
+            case Command::Type::PEEK:
+                doPeekCommand(cmd.peek);
+                scriptWait = ScriptWait::ARRIVAL;
+                return;
+            case Command::Type::RAW:
+                doRawCommand(cmd.rawL, cmd.rawR);
+                scriptWait = ScriptWait::ARRIVAL;
+                return;
+            default:
+                continue;
+        }
+    }
+
+    // Ende erreicht -> von vorne (Schleife).
+    scriptIndex = 0;
+}
+
 void handleLine(const char* line) {
     // Beim ersten Befehl nach einem Boot die Reset-Diagnose automatisch melden,
     // damit sie im Test-GUI sichtbar wird, ohne einen Monitor anschliessen zu muessen.
@@ -351,6 +672,26 @@ void handleLine(const char* line) {
     if (!sentResetLog) {
         sentResetLog = true;
         ble.sendLine(resetLog.format().c_str());
+    }
+
+    // Script-Upload: zwischen SCRIPT_CLEAR und SCRIPT_END werden Zeilen gesammelt.
+    if (scriptLoading) {
+        if (std::strcmp(line, "SCRIPT_END") == 0) {
+            scriptLoading = false;
+            char buf[48];
+            snprintf(buf, sizeof(buf), "SCRIPT loaded %u", (unsigned)scriptLines.size());
+            ble.sendLine(buf);
+        } else if (scriptLines.size() < SCRIPT_MAX_LINES) {
+            scriptLines.push_back(line);
+        }
+        return;
+    }
+    if (std::strcmp(line, "SCRIPT_CLEAR") == 0) {
+        scriptLines.clear();
+        scriptActive = false;
+        scriptLoading = true;
+        ble.sendLine("SCRIPT loading");
+        return;
     }
 
     Command cmd;
@@ -361,56 +702,24 @@ void handleLine(const char* line) {
 
     switch (cmd.type) {
         case Command::Type::MOVE: {
-            autoActive = false;
-            directMode = false;
-
-            // Ziel auf den naechsten gueltigen Punkt snappen
-            float tx = cmd.x, ty = cmd.y;
-            workspace.nearestValid(cmd.x, cmd.y, tx, ty);
-
-            if (cmd.snap) {
-                planner.moveTo(tx, ty, MotionPlanner::MoveType::SNAP);
-            } else {
-                // Pfad vom aktuellen Punkt (ggf. gesnappt) zum Ziel (A* um die Sperrzone)
-                float sx = planner.x(), sy = planner.y();
-                workspace.nearestValid(sx, sy, sx, sy);
-                std::vector<Point> path;
-                if (workspace.findPath(sx, sy, tx, ty, path)) {
-                    planner.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
-                } else {
-                    planner.moveTo(tx, ty, MotionPlanner::MoveType::SMOOTH);
-                }
-            }
+            scriptActive = false;
+            doMoveCommand(cmd.x, cmd.y, cmd.snap);
             ble.sendLine("OK");
             break;
         }
 
         case Command::Type::PEEK:
-            autoActive = false;
-            directMode = false;
-            switch (cmd.peek) {
-                case Command::Peek::LEFT:
-                    planner.moveTo(POS_LEFT_X, POS_LEFT_Y, MotionPlanner::MoveType::SMOOTH);
-                    break;
-                case Command::Peek::RIGHT:
-                    planner.moveTo(POS_RIGHT_X, POS_RIGHT_Y, MotionPlanner::MoveType::SMOOTH);
-                    break;
-                case Command::Peek::TOP:
-                    // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
-                    // Montage-Referenz; umgeht die IK, da das exakte "beide oben"
-                    // knapp ausserhalb der IK-Reichweite liegt.
-                    setServoDirect(servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f)),
-                                   servos.angleToPulseUsRight(Kinematics::degToRad(90.0f)));
-                    break;
-                case Command::Peek::HIDE:
-                    setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
-                    break;
-            }
+            scriptActive = false;
+            doPeekCommand(cmd.peek);
             ble.sendLine("OK");
             break;
 
         case Command::Type::STOP:
             autoActive = false;
+            randomActive = false;
+            playbackActive = false;
+            recActive = false;
+            scriptActive = false;
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
             ble.sendLine("OK");
             break;
@@ -420,10 +729,57 @@ void handleLine(const char* line) {
             ble.sendLine("OK");
             break;
 
+        case Command::Type::RANDOM:
+            if (randomActive) {
+                randomActive = false;
+                setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);   // beenden -> verstecken
+                ble.sendLine("RANDOM off");
+            } else {
+                startRandomMode();
+                ble.sendLine("RANDOM on");
+            }
+            break;
+
+        case Command::Type::REC:
+            if (recActive) {
+                recActive = false;
+                char buf[48];
+                snprintf(buf, sizeof(buf), "REC off %u", (unsigned)recCount);
+                ble.sendLine(buf);
+            } else {
+                startRecording();
+                ble.sendLine("REC on");
+            }
+            break;
+
+        case Command::Type::PLAY:
+            if (playbackActive) {
+                playbackActive = false;
+                ble.sendLine("PLAY off");
+            } else if (recCount == 0) {
+                ble.sendLine("PLAY empty");
+            } else {
+                startPlayback();
+                ble.sendLine("PLAY on");
+            }
+            break;
+
+        case Command::Type::RUN:
+            if (scriptActive) {
+                scriptActive = false;
+                ble.sendLine("RUN off");
+            } else if (scriptLines.empty()) {
+                ble.sendLine("RUN empty");
+            } else {
+                startScript();
+                ble.sendLine("RUN on");
+            }
+            break;
+
         case Command::Type::RAW:
             // Direkter Servo-Test: IK/Planner umgehen, Pulsbreiten direkt setzen.
-            autoActive = false;
-            setServoDirect(cmd.rawL, cmd.rawR);
+            scriptActive = false;
+            doRawCommand(cmd.rawL, cmd.rawR);
             ble.sendLine("OK");
             break;
 
@@ -458,6 +814,12 @@ void handleLine(const char* line) {
             break;
         }
 
+        case Command::Type::DELAY:
+        case Command::Type::WAIT:
+            // Nur innerhalb eines Scripts sinnvoll; einzeln gesendet ignorieren wir sie.
+            ble.sendLine("OK");
+            break;
+
         default:
             break;
     }
@@ -471,7 +833,7 @@ void setup() {
     Serial.printf("Reset-Grund: %s (boot=%u)\n",
                   resetLog.lastReasonText().c_str(), resetLog.bootCount());
 
-    // Servo-Kalibrierung (am Aufbau ermittelt):
+    // Servo-Kalibrierung (am Modell verifiziert):
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
     //   links = 500 us, rechts = 2500 us.
     // Kurbel senkrecht nach oben (theta = 90°):
@@ -512,12 +874,22 @@ void loop() {
 
     if (autoActive) {
         updateAutoMode();
+    } else if (randomActive) {
+        updateRandomMode();
+    } else if (playbackActive) {
+        updatePlayback();
     } else {
+        if (scriptActive) {
+            updateScript();
+        }
         planner.update(dt);
         if (!directMode) {
             moveToPosition(planner.x(), planner.y());
         }
     }
+
+    // Aufnahme (passiv): aktuelles Servo-Ziel in festem Takt abtasten.
+    updateRecording();
 
     // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
     updateServoRamp(dt);

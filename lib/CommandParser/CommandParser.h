@@ -8,7 +8,7 @@
 
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, RANDOM, REC, PLAY, DELAY, WAIT, RUN };
     enum class Peek { LEFT, RIGHT, TOP, HIDE };
 
     Type type = Type::NONE;
@@ -19,6 +19,7 @@ struct Command {
     uint16_t rawL = 1500;      // RAW: linker Servo-Puls [us]
     uint16_t rawR = 1500;      // RAW: rechter Servo-Puls [us]
     float    ramp = -1.0f;     // RAMP: Rate-Limit [us/s]; -1 = nur abfragen
+    uint32_t delayMs = 0;      // DELAY: Wartezeit [ms]
 };
 
 class CommandParser {
