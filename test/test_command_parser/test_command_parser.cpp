@@ -99,6 +99,21 @@ void test_resetlog(void) {
     TEST_ASSERT_TRUE(c.type == Command::Type::RESETLOG);
 }
 
+void test_ramp(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("RAMP 750", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::RAMP);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 750.0f, c.ramp);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("RAMP", c));   // Abfrage ohne Wert
+    TEST_ASSERT_TRUE(c.type == Command::Type::RAMP);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, -1.0f, c.ramp);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("ramp 1000", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::RAMP);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1000.0f, c.ramp);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -112,5 +127,6 @@ int main(void) {
     RUN_TEST(test_raw_clamp);
     RUN_TEST(test_auto);
     RUN_TEST(test_resetlog);
+    RUN_TEST(test_ramp);
     return UNITY_END();
 }

@@ -117,5 +117,14 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "RAMP")) {
+        out.type = Command::Type::RAMP;
+        char* vs = std::strtok(nullptr, " \t\r\n");
+        if (vs != nullptr) {
+            out.ramp = std::strtof(vs, nullptr);
+        }
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }

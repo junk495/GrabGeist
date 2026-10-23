@@ -13,6 +13,7 @@
   #map { border: 1px solid #333; width: 100%; max-width: 460px; image-rendering: pixelated; touch-action: none; }
   hr { margin: 20px 0; }
   .hint { color: #666; font-size: 14px; }
+  .resetBox { background:#fff3cd; border:1px solid #e0c060; padding:8px 10px; font-family:monospace; font-size:15px; margin:8px 0; white-space:pre-wrap; word-break:break-all; }
 </style>
 </head>
 <body>
@@ -21,7 +22,7 @@
 <button id="connect">Verbinden</button>
 <span id="status">nicht verbunden</span>
 <button id="resetlog" style="margin-left:12px">Reset-Log</button>
-<p id="resetInfo" class="hint"></p>
+<p id="resetInfo" class="resetBox"></p>
 
 <hr>
 <canvas id="map" width="89" height="74"></canvas>
@@ -43,6 +44,17 @@
 <div>
   <button id="auto">AUTO (Ablauf)</button>
   <span class="hint">links &rarr; oben &rarr; rechts &rarr; versteckt &middot; 1 s / 2 s</span>
+</div>
+
+<hr>
+<div>
+  <h3>Servo-Tempo (Anfahrrampe)</h3>
+  <div class="row">
+    <label>Rampe (&micro;s/s): <input type="range" id="ramp" min="100" max="3500" step="50" value="750"></label>
+    <span id="rampVal">750</span>
+  </div>
+  <button id="rampReset">Standard (750)</button>
+  <p class="hint">klein = sanft &amp; sicher (weniger Stromspitzen), gro&szlig; = schneller. 3500 &asymp; volle Servogeschwindigkeit.</p>
 </div>
 
 <hr>
@@ -74,6 +86,8 @@ let txChar = null;
 
 const status = document.getElementById('status');
 const resetInfo = document.getElementById('resetInfo');
+const rampSlider = document.getElementById('ramp');
+const rampVal = document.getElementById('rampVal');
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 
@@ -149,6 +163,13 @@ function handleRxLine(line) {
   } else if (line.startsWith('RST ')) {
     // Reset-Diagnose anzeigen (kommt automatisch nach dem Verbinden oder auf "Reset-Log").
     resetInfo.textContent = 'Reset: ' + line.slice(4);
+  } else if (line.startsWith('RAMP ')) {
+    const v = Math.round(+line.split(' ')[1]);
+    rampSlider.value = v;
+    rampVal.textContent = v;
+  } else if (line.startsWith('ERR ')) {
+    resetInfo.textContent = 'Fehler: ' + line.slice(4) +
+      ' (Befehl nicht erkannt? Dann ist auf dem ESP32 noch die alte Firmware - neu flashen.)';
   } else if (mapInfo && !mapComplete) {
     if (line.length === 0) return;   // Leerzeilen nicht als Reihe zaehlen
     mapRows.push(line);
@@ -208,8 +229,20 @@ async function connect() {
 }
 
 document.getElementById('connect').onclick = connect;
-document.getElementById('resetlog').onclick = () => send('RESETLOG');
+document.getElementById('resetlog').onclick = () => {
+  if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
+  status.textContent = 'Reset-Log wird abgefragt...';
+  send('RESETLOG');
+};
 document.getElementById('stop').onclick = () => send('STOP');
+
+rampSlider.oninput = () => { rampVal.textContent = rampSlider.value; };
+rampSlider.onchange = () => send(`RAMP ${rampSlider.value}`);
+document.getElementById('rampReset').onclick = () => {
+  rampSlider.value = 750;
+  rampVal.textContent = '750';
+  send('RAMP 750');
+};
 document.getElementById('auto').onclick = () => send('AUTO');
 document.querySelectorAll('button[data-cmd]').forEach(b => {
   b.onclick = () => send(b.dataset.cmd);

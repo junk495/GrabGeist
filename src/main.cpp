@@ -36,6 +36,16 @@ static const uint32_t SERVO_DUTY_FS   = (1u << SERVO_RES_BITS);     // 2^14 = 16
 static const uint32_t LOOP_INTERVAL_MS = 20;   // 50 Hz
 
 // ---------------------------------------------------------------------------
+// Servo-Anfahrrampe (Rate-Limit): maximale Pulsbreiten-Aenderung pro Sekunde [us/s].
+// 500..2500 us entsprechen 270° -> 750 us/s ~ 100°/s Kurbelgeschwindigkeit.
+// Je kleiner, desto sanfter der Anlauf (weniger Stromspitzen beim 5V-/LiPo-Betrieb).
+// 0 = keine Begrenzung (Servos springen sofort). Zur Laufzeit per Befehl "RAMP <us/s>"
+// aenderbar ("RAMP" ohne Wert fragt den aktuellen Wert ab).
+// ---------------------------------------------------------------------------
+static constexpr float SERVO_RAMP_US_PER_S_DEFAULT = 750.0f;
+static float servoRampUsPerS = SERVO_RAMP_US_PER_S_DEFAULT;
+
+// ---------------------------------------------------------------------------
 // Preset-Koordinaten (ANPASSEN, sobald die Mechanik aus Fusion steht!)
 // ---------------------------------------------------------------------------
 static const float POS_LEFT_X  = -50.0f, POS_LEFT_Y  = 150.0f;
@@ -59,6 +69,10 @@ static uint16_t lastPulseR = 0;
 static bool     lastIkValid = false;
 static bool     directMode = false;   // true = Servos direkt ansteuern (RAW), IK/Planner pausiert
 
+// Servo-Soll (Ziel) und tatsaechlich ausgegebene Pulsbreite (durch die Rampe begrenzt).
+static uint16_t desiredPulseL = 0, desiredPulseR = 0;
+static uint16_t outputPulseL = 0, outputPulseR = 0;
+
 // ---------------------------------------------------------------------------
 // Auto-Ablauf: links -> oben -> rechts -> versteckt -> links -> ...
 // 1 s Uebergang, 2 s Halten pro Position.
@@ -80,6 +94,54 @@ void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     if (!ledcWrite(pin, duty)) {
         Serial.printf("ledcWrite fehlgeschlagen (pin=%u duty=%u)\n", pin, (unsigned)duty);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Ziel-Pulsbreiten setzen (Soll). Die tatsaechliche Ausgabe naehert sich diesem
+// Ziel in updateServoRamp() mit begrenzter Geschwindigkeit an.
+// ---------------------------------------------------------------------------
+void setTargetPulses(uint16_t pulseL, uint16_t pulseR) {
+    desiredPulseL = pulseL;
+    desiredPulseR = pulseR;
+    lastPulseL = pulseL;
+    lastPulseR = pulseR;
+    lastIkValid = true;
+}
+
+// Sofort auf eine Position setzen (ohne Rampe) - fuer Start/Homing.
+void setServoInstant(uint16_t pulseL, uint16_t pulseR) {
+    directMode = true;
+    setTargetPulses(pulseL, pulseR);
+    outputPulseL = pulseL;
+    outputPulseR = pulseR;
+    servoWriteUs(PIN_SERVO_LEFT,  pulseL);
+    servoWriteUs(PIN_SERVO_RIGHT, pulseR);
+}
+
+// ---------------------------------------------------------------------------
+// Servo-Ausgabe mit Rate-Limit: bewegt die tatsaechlich ausgegebenen Pulsbreiten
+// pro Zeitschritt maximal um servoRampUsPerS * dt in Richtung Ziel. Das begrenzt
+// die Servo-Geschwindigkeit/Beschleunigung und damit die Stromspitzen.
+// ---------------------------------------------------------------------------
+void updateServoRamp(float dt) {
+    if (servoRampUsPerS <= 0.0f) {
+        // Keine Begrenzung -> direkt ans Ziel springen.
+        outputPulseL = desiredPulseL;
+        outputPulseR = desiredPulseR;
+    } else {
+        const float maxStep = servoRampUsPerS * dt;
+        const float dl = (float)desiredPulseL - (float)outputPulseL;
+        const float dr = (float)desiredPulseR - (float)outputPulseR;
+        if (dl > maxStep)       outputPulseL = (uint16_t)((float)outputPulseL + maxStep);
+        else if (dl < -maxStep) outputPulseL = (uint16_t)((float)outputPulseL - maxStep);
+        else                    outputPulseL = desiredPulseL;
+        if (dr > maxStep)       outputPulseR = (uint16_t)((float)outputPulseR + maxStep);
+        else if (dr < -maxStep) outputPulseR = (uint16_t)((float)outputPulseR - maxStep);
+        else                    outputPulseR = desiredPulseR;
+    }
+
+    servoWriteUs(PIN_SERVO_LEFT,  outputPulseL);
+    servoWriteUs(PIN_SERVO_RIGHT, outputPulseR);
 }
 
 // Karte als einen grossen Textblock senden: statt 75 einzelner Zeilen wird der
@@ -160,11 +222,8 @@ void moveToPosition(float x, float y) {
     if (Kinematics::calculateIK(x, y, lastThetaL, lastThetaR, thetaL, thetaR)) {
         lastThetaL = thetaL;
         lastThetaR = thetaR;
-        lastPulseL = servos.angleToPulseUsLeft(thetaL);
-        lastPulseR = servos.angleToPulseUsRight(thetaR);
-        lastIkValid = true;
-        servoWriteUs(PIN_SERVO_LEFT,  lastPulseL);
-        servoWriteUs(PIN_SERVO_RIGHT, lastPulseR);
+        setTargetPulses(servos.angleToPulseUsLeft(thetaL),
+                        servos.angleToPulseUsRight(thetaR));
     } else {
         lastIkValid = false;   // ungueltige Position -> Servos halten letzte Stellung
     }
@@ -175,11 +234,7 @@ void moveToPosition(float x, float y) {
 // ---------------------------------------------------------------------------
 void setServoDirect(uint16_t pulseL, uint16_t pulseR) {
     directMode = true;
-    lastPulseL = pulseL;
-    lastPulseR = pulseR;
-    lastIkValid = true;
-    servoWriteUs(PIN_SERVO_LEFT,  pulseL);
-    servoWriteUs(PIN_SERVO_RIGHT, pulseR);
+    setTargetPulses(pulseL, pulseR);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,11 +295,7 @@ void updateAutoMode() {
         if (t > 1.0f) t = 1.0f;
         uint16_t l = (uint16_t)((float)autoStartL + ((float)autoTargetL - (float)autoStartL) * t);
         uint16_t r = (uint16_t)((float)autoStartR + ((float)autoTargetR - (float)autoStartR) * t);
-        servoWriteUs(PIN_SERVO_LEFT,  l);
-        servoWriteUs(PIN_SERVO_RIGHT, r);
-        lastPulseL = l;
-        lastPulseR = r;
-        lastIkValid = true;
+        setTargetPulses(l, r);
 
         if (elapsed >= AUTO_MOVE_MS) {
             autoMoving = false;
@@ -397,6 +448,16 @@ void handleLine(const char* line) {
             ble.sendLine(resetLog.format().c_str());
             break;
 
+        case Command::Type::RAMP: {
+            if (cmd.ramp >= 0.0f) {
+                servoRampUsPerS = cmd.ramp;
+            }
+            char buf[48];
+            snprintf(buf, sizeof(buf), "RAMP %.0f", (double)servoRampUsPerS);
+            ble.sendLine(buf);
+            break;
+        }
+
         default:
             break;
     }
@@ -430,7 +491,7 @@ void setup() {
 
     // Startposition: versteckt (direkte Servo-Position)
     planner.setPosition(0.0f, 170.0f);   // Planner-Referenz fuer nachfolgende IK-Bewegungen
-    setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+    setServoInstant(HIDE_PULSE_L, HIDE_PULSE_R);
 
     // BLE starten
     ble.setLineCallback(handleLine);
@@ -457,6 +518,9 @@ void loop() {
             moveToPosition(planner.x(), planner.y());
         }
     }
+
+    // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
+    updateServoRamp(dt);
 
     // Karten-Chunks senden (nicht-blockierend).
     updateMapSend();
