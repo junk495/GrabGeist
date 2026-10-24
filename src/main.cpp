@@ -138,14 +138,9 @@ static void startWifiAp() {
 }
 
 static void applyWifiMode() {
-    if (wifiMode == WifiMode::OFF) {
-        if (wifiStarted) {
-            WiFi.mode(WIFI_OFF);
-            wifiStarted = false;
-        }
-    } else {
-        startWifiAp();
-    }
+    // WiFi ist deaktiviert (BLE-only). Der SoftAP lief parallel zu BLE und
+    // stoerte die BLE-Verbindung ueber die 2,4-GHz-Funk-Koexistenz. Der Code
+    // bleibt vorerst stehen, startet aber nichts mehr (wird spaeter entfernt).
 }
 
 // ---------------------------------------------------------------------------

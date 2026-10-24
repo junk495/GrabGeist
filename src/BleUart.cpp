@@ -9,29 +9,54 @@
 #define CHAR_RX_UUID "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"   // Handy -> ESP
 #define CHAR_TX_UUID "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"   // ESP -> Handy
 
-void BleUart::begin(const char* deviceName) {
-    BLEDevice::setMTU(247);   // groessere MTU fuer den Kartentransfer
-    BLEDevice::init(deviceName);
+namespace {
+// Startet das Advertising nach einem Verbindungsabbruch neu. Ohne das bleibt
+// der ESP32 nach einem Disconnect "unsichtbar": Das Handy findet ihn erst nach
+// einem Reset wieder (auch der Auto-Reconnect der PWA schlaegt dann fehl).
+class ServerCallbacks : public NimBLEServerCallbacks {
+public:
+    NimBLEAdvertising* advertising = nullptr;
 
-    BLEServer* server = BLEDevice::createServer();
-    BLEService* service = server->createService(SERVICE_UUID);
+    void onConnect(NimBLEServer* server, NimBLEConnInfo& connInfo) override {
+        // Advertising stoppt beim Verbinden automatisch.
+    }
+
+    void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override {
+        if (advertising != nullptr) {
+            advertising->start();
+        }
+    }
+};
+}  // namespace
+
+void BleUart::begin(const char* deviceName) {
+    NimBLEDevice::init(deviceName);
+    NimBLEDevice::setMTU(247);   // groessere MTU fuer den Kartentransfer
+
+    NimBLEServer* server = NimBLEDevice::createServer();
+
+    // Advertising nach Disconnect automatisch wieder starten.
+    auto* serverCallbacks = new ServerCallbacks();
+    server->setCallbacks(serverCallbacks);
+
+    NimBLEService* service = server->createService(SERVICE_UUID);
 
     rxCharacteristic_ = service->createCharacteristic(
         CHAR_RX_UUID,
-        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+        NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
     rxCharacteristic_->setCallbacks(this);
 
     txCharacteristic_ = service->createCharacteristic(
         CHAR_TX_UUID,
-        BLECharacteristic::PROPERTY_NOTIFY);
-
-    service->start();
+        NIMBLE_PROPERTY::NOTIFY);
 
     // Service-UUID mit ins Advertising aufnehmen. Ohne diesen Aufruf wird nur der
     // Geraetename ausgestrahlt; Clients, die per Service-UUID filtern (z.B. Web
     // Bluetooth in tools/test_gui.html), finden das Geraet dann nicht.
-    server->getAdvertising()->addServiceUUID(SERVICE_UUID);
-    server->getAdvertising()->start();
+    NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+    advertising->addServiceUUID(SERVICE_UUID);
+    advertising->start();
+    serverCallbacks->advertising = advertising;
 }
 
 void BleUart::setLineCallback(LineCallback cb) {
@@ -42,7 +67,7 @@ void BleUart::sendLine(const char* line) {
     if (txCharacteristic_ == nullptr || line == nullptr) {
         return;
     }
-    String payload = String(line) + "\n";
+    std::string payload = std::string(line) + "\n";
     txCharacteristic_->setValue(payload);
     txCharacteristic_->notify();
 
@@ -71,12 +96,12 @@ void BleUart::sendChunked(const char* data, size_t len) {
     }
 }
 
-void BleUart::onWrite(BLECharacteristic* characteristic) {
+void BleUart::onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo& connInfo) {
     if (characteristic != rxCharacteristic_) {
         return;
     }
-    String value = characteristic->getValue();
-    buffer_ += value.c_str();
+    std::string value = characteristic->getValue();
+    buffer_ += value;
 
     // Komplette Zeilen (durch \n getrennt) herausziehen und ausliefern
     size_t pos;

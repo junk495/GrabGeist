@@ -1,16 +1,17 @@
 // BleUart.h
-// BLE-UART (Nordic UART Service) fuer die einfache Test-Steuerung.
-// ESP32-spezifisch (nutzt das BLE-API des Arduino-Cores) — nicht nativ testbar.
+// BLE-UART (Nordic UART Service). Nutzt NimBLE — stabiler mit Android als Bluedroid.
+// ESP32-spezifisch — nicht nativ testbar.
 
 #pragma once
 
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
+#include <NimBLEDevice.h>
+#include <NimBLEServer.h>
+#include <NimBLEUtils.h>
+#include <NimBLEConnInfo.h>
 
 #include <string>
 
-class BleUart : public BLECharacteristicCallbacks {
+class BleUart : public NimBLECharacteristicCallbacks {
 public:
     // Rueckruf: wird aufgerufen, wenn eine komplette Zeile (ohne \n) empfangen wurde.
     using LineCallback = void (*)(const char* line);
@@ -24,12 +25,12 @@ public:
     // Großen Textblock in MTU-gerechten Chunks senden (fuer die Arbeitsraum-Karte).
     void sendChunked(const char* data, size_t len);
 
-    // BLECharacteristicCallbacks
-    void onWrite(BLECharacteristic* characteristic) override;
+    // NimBLECharacteristicCallbacks
+    void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo& connInfo) override;
 
 private:
-    BLECharacteristic* rxCharacteristic_ = nullptr;   // Handy -> ESP
-    BLECharacteristic* txCharacteristic_ = nullptr;   // ESP -> Handy (notify)
+    NimBLECharacteristic* rxCharacteristic_ = nullptr;   // Handy -> ESP
+    NimBLECharacteristic* txCharacteristic_ = nullptr;   // ESP -> Handy (notify)
     LineCallback lineCallback_ = nullptr;
     std::string buffer_;
 };
