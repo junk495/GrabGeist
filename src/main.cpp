@@ -730,6 +730,38 @@ void handleLine(const char* line) {
         ble.sendLine(resetLog.format().c_str());
     }
 
+    // Sequence-Befehle: JSON kann laenger als der CommandParser-Puffer sein,
+    // deshalb direkt hier auswerten.
+    if (std::strncmp(line, "SEQ_SET ", 8) == 0) {
+        Sequence parsed;
+        std::string err;
+        if (Sequence::fromJson(line + 8, parsed, &err)) {
+            currentSequence = parsed;
+            saveSequence();
+            ble.sendLine("SEQ saved");
+        } else {
+            ble.sendLine("SEQ error");
+        }
+        return;
+    }
+    if (std::strcmp(line, "SEQ_RUN") == 0) {
+        if (seqActive) {
+            seqActive = false;
+            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+            ble.sendLine("SEQ off");
+        } else {
+            startSequence();
+            ble.sendLine("SEQ run");
+        }
+        return;
+    }
+    if (std::strcmp(line, "SEQ_STOP") == 0) {
+        seqActive = false;
+        setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+        ble.sendLine("SEQ stop");
+        return;
+    }
+
     Command cmd;
     if (!CommandParser::parse(line, cmd)) {
         ble.sendLine("ERR unknown");
