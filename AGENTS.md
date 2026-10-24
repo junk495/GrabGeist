@@ -27,7 +27,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - `src/BleUart.{h,cpp}` — BLE-UART (Nordic-UART-Service) als Testkanal (ESP32-spezifisch)
 - `src/ResetLog.{h,cpp}` — persistente Reset-Diagnose (NVS) (ESP32-spezifisch)
 - `src/ApiServer.{h,cpp}` — WiFi-Webserver + JSON-API (REST) (ESP32-spezifisch)
-- `data/index.html` — Web-UI (PWA) als Ablauf-Editor
+- `data/index.html` — alte WiFi-Web-UI (wird durch die PWA im Repo `GrabGeistApp` ersetzt)
 - `lib/Kinematics/` — inverse Kinematik (pur, hardwarefrei)
 - `lib/ServoController/` — Kurbelwinkel → PWM-Pulsbreite
 - `lib/ServoSpeed/` — Servo-Rampe/Strombegrenzung (µs/s)
@@ -36,7 +36,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - `lib/Sequence/` — JSON-Ablauf (Move/Preset/Delay/Wait) mit Persistenz
 - `lib/Point/` — gemeinsamer 2D-Punkt-Typ (`struct Point`, Header-only)
 - `test/` — native Unit-Tests (Unity)
-- `tools/test_gui.html` — Handy-Testoberfläche (Web Bluetooth)
+- `tools/test_gui.html` — BLE-Testoberfläche (Referenz; wird durch die PWA `GrabGeistApp` ersetzt)
 - `SystemSpecification.md` — Spezifikation (autoritativ)
 - `kinematik_konzept.md` — IK-Briefing (Maße, Formeln, Beispiel)
 - `steuerung_konzept.md` — Steuerungskonzept (Tasten/BLE/Joystick/Web)
@@ -52,3 +52,8 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - Datenfluss: Eingabe (`BleUart`/`ApiServer`) → `CommandParser`/`Sequence` → `Workspace` → `Kinematics` → `ServoController` → LEDC; Bewegung über Wegpunkt-Folge + `ServoSpeed`-Rampe.
 - Wiederverwendbare/testbare Logik in `lib/`; ESP32-spezifischer Code (BLE, LEDC) in `src/`.
 - IK-Solver `calculateIK(x, y, &thetaL, &thetaR)` ist **bimodal** (Knie nach außen + Over-Center) und lehnt ungültige/kollidierende Koordinaten mit `false` ab (siehe Spec §4).
+
+## App (getrenntes Repo)
+- Die Bedienoberfläche ist eine **PWA im Repo `GrabGeistApp`** (Web Bluetooth, Nordic UART Service) — nicht in diesem Repo.
+- **BLE-Textprotokoll** (UUIDs + Befehle `MOVE`/`PEEK`/`RAW`/`MAP`/`STATUS`/…) ist der **Vertrag** zwischen App und Firmware; bei Änderung **beide Repos** anpassen.
+- `data/index.html` (WiFi-Web-UI) und `tools/test_gui.html` (BLE-Test) werden durch die PWA abgelöst; WiFi (`ApiServer`) wird im Zuge des Umbaus entfernt.

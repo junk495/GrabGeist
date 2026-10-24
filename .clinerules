@@ -18,3 +18,8 @@
 - Vor Abschluss einer Aufgabe Tests laufen lassen: `pio test -e test`.
 - IK-Solver muss ungültige Koordinaten ablehnen (`bool`-Rückgabe, siehe Spec §4).
 - Keine Build-Artefakte committen (`.pio/`, `build/` …).
+
+## App (getrenntes Repo)
+- Die Bedienoberfläche ist eine **PWA im Repo `GrabGeistApp`** (Web Bluetooth, Nordic UART Service) — nicht hier.
+- BLE-Textprotokoll (UUIDs + Befehle) ist der Vertrag zwischen App und Firmware; bei Änderung **beide Repos** anpassen.
+- `data/index.html` (WiFi-Web-UI) und `tools/test_gui.html` (BLE-Test) werden durch die PWA abgelöst.
