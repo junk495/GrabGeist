@@ -9,7 +9,7 @@
 
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, SPEED, RANDOM, REC, PLAY, WIFI };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, SPEED, RANDOM, REC, PLAY };
     enum class Peek { LEFT, RIGHT, TOP, HIDE };
 
     Type type = Type::NONE;
@@ -21,7 +21,6 @@ struct Command {
     uint16_t rawR = 1500;      // RAW: rechter Servo-Puls [us]
     float    ramp = -1.0f;     // RAMP: Strombegrenzung [us/s]; -1 = nur abfragen
     float    speed = -1.0f;    // SPEED: 0..100 %; -1 = nur abfragen
-    std::string wifiMode;      // WIFI: on | off | auto
 };
 
 class CommandParser {

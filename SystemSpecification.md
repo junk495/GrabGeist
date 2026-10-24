@@ -140,7 +140,7 @@ Aus den 7 Prüfungen ergibt sich ein **nierenförmiger** Arbeitsraum: große obe
    - `PRESET`: Fest kodierte Trajektorien (Sweep links–rechts, Pop-out und zurück).
       → Umsetzung: ersetzt durch **JSON-Abläufe** (`Sequence`, über die Web-UI/JSON-API bearbeitet und per `POST /api/run` abgespielt).
 
-> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe (`ServoSpeed`), ein Reset-Log (NVS), ein WiFi-SoftAP mit JSON-API (`ApiServer`) und ein persistent gespeicherter JSON-Ablauf (`Sequence`). `PRESET` ist durch JSON-Abläufe ersetzt.
+> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe (`ServoSpeed`), ein Reset-Log (NVS) und ein persistent gespeicherter JSON-Ablauf (`Sequence`). Bedienung über BLE (Nordic UART Service, NimBLE); die Oberfläche ist die PWA im Repo `GrabGeistApp`. `PRESET` ist durch JSON-Abläufe ersetzt.
 
 
 

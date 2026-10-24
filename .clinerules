@@ -22,4 +22,4 @@
 ## App (getrenntes Repo)
 - Die Bedienoberfläche ist eine **PWA im Repo `GrabGeistApp`** (Web Bluetooth, Nordic UART Service) — nicht hier.
 - BLE-Textprotokoll (UUIDs + Befehle) ist der Vertrag zwischen App und Firmware; bei Änderung **beide Repos** anpassen.
-- `data/index.html` (WiFi-Web-UI) und `tools/test_gui.html` (BLE-Test) werden durch die PWA abgelöst.
+- WiFi/Web-UI sind entfernt; Bedienung nur über die PWA.

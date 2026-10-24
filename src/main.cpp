@@ -7,7 +7,6 @@
 #include <Arduino.h>
 #include <esp_random.h>   // esp_random() fuer den Zufallsmodus
 #include <Preferences.h>
-#include <WiFi.h>
 #include <LittleFS.h>
 
 #include <ArduinoJson.h>
@@ -22,7 +21,6 @@
 #include <string>
 #include <vector>
 
-#include "ApiServer.h"
 #include "BleUart.h"
 #include "ResetLog.h"
 
@@ -75,72 +73,6 @@ static void saveMaxRate() {
     prefs.begin(kPrefsNamespace, false);
     prefs.putFloat("maxRate", maxRateUsPerSec);
     prefs.end();
-}
-
-static ApiServer api;
-
-// ---------------------------------------------------------------------------
-// WiFi (SoftAP) fuer die Web-UI. Modus in NVS gespeichert: on / off / auto.
-// ---------------------------------------------------------------------------
-enum class WifiMode { OFF, ON, AUTO };
-static WifiMode  wifiMode = WifiMode::AUTO;   // Standard: auto (AP beim Boot an, nach 3 min ohne Client aus)
-static uint32_t  wifiStartMs = 0;
-static uint32_t  wifiLastClientMs = 0;
-static bool      wifiStarted = false;
-static bool      apiStarted = false;
-static const uint32_t WIFI_AUTO_TIMEOUT_MS = 180000;   // 3 min
-
-static WifiMode wifiModeFromString(const char* s) {
-    if (std::strcmp(s, "off") == 0)  return WifiMode::OFF;
-    if (std::strcmp(s, "auto") == 0) return WifiMode::AUTO;
-    return WifiMode::ON;
-}
-
-static const char* wifiModeToString(WifiMode m) {
-    switch (m) {
-        case WifiMode::OFF:  return "off";
-        case WifiMode::AUTO: return "auto";
-        default:             return "on";
-    }
-}
-
-static void loadWifiMode() {
-    Preferences prefs;
-    prefs.begin(kPrefsNamespace, true);
-    const String m = prefs.getString("wifiMode", "auto");
-    prefs.end();
-    wifiMode = wifiModeFromString(m.c_str());
-}
-
-static void saveWifiMode() {
-    Preferences prefs;
-    prefs.begin(kPrefsNamespace, false);
-    prefs.putString("wifiMode", wifiModeToString(wifiMode));
-    prefs.end();
-}
-
-static void startWifiAp() {
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1),
-                      IPAddress(255, 255, 255, 0));
-    WiFi.softAP("GrabGeist");
-    // Mittelweg 15 dBm: volle Leistung (~20 dBm) verursachte am USB-Port
-    // Stromspitzen -> Brownout (Servos zucken, AP bricht ab); 8,5 dBm war zu
-    // schwach. 15 dBm reicht fuer einige Meter und haelt die Spitzen klein.
-    WiFi.setTxPower(WIFI_POWER_15dBm);
-    wifiStartMs = millis();
-    wifiLastClientMs = millis();
-    wifiStarted = true;
-    if (!apiStarted) {
-        api.begin();   // HTTP-Server erst starten, wenn WiFi laeuft
-        apiStarted = true;
-    }
-}
-
-static void applyWifiMode() {
-    // WiFi ist deaktiviert (BLE-only). Der SoftAP lief parallel zu BLE und
-    // stoerte die BLE-Verbindung ueber die 2,4-GHz-Funk-Koexistenz. Der Code
-    // bleibt vorerst stehen, startet aber nichts mehr (wird spaeter entfernt).
 }
 
 // ---------------------------------------------------------------------------
@@ -790,147 +722,6 @@ static void updateSequence() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// JSON-API: Endpunkte mit den internen Aktionen verdrahten.
-// ---------------------------------------------------------------------------
-static void setupApiCallbacks() {
-    api.onInfo = []() -> String {
-        DynamicJsonDocument doc(256);
-        doc["name"] = "GrabGeist";
-        doc["version"] = "0.3.0";
-        doc["wifi"] = wifiModeToString(wifiMode);
-        String out;
-        serializeJson(doc, out);
-        return out;
-    };
-
-    api.onStatus = []() -> String {
-        DynamicJsonDocument doc(256);
-        doc["x"] = currentX;
-        doc["y"] = currentY;
-        doc["pulseL"] = lastPulseL;
-        doc["pulseR"] = lastPulseR;
-        doc["ramp"] = maxRateUsPerSec;
-        doc["speed"] = servoSpeedPercent;
-        doc["moving"] = wpActive;
-        doc["seq"] = seqActive;
-        doc["random"] = randomActive;
-        String out;
-        serializeJson(doc, out);
-        return out;
-    };
-
-    api.onMap = []() -> String {
-        DynamicJsonDocument doc(16384);
-        doc["w"] = workspace.width();
-        doc["h"] = workspace.height();
-        doc["xMin"] = workspace.xMin();
-        doc["yMin"] = workspace.yMin();
-        doc["step"] = workspace.step();
-        JsonArray rows = doc.createNestedArray("rows");
-        const std::vector<uint8_t>& grid = workspace.grid();
-        for (int cy = workspace.height() - 1; cy >= 0; --cy) {
-            std::string row;
-            row.reserve(workspace.width());
-            for (int cx = 0; cx < workspace.width(); ++cx) {
-                row += grid[cy * workspace.width() + cx] ? '1' : '0';
-            }
-            rows.add(row);
-        }
-        String out;
-        serializeJson(doc, out);
-        return out;
-    };
-
-    api.onReset = []() -> String {
-        DynamicJsonDocument doc(256);
-        doc["log"] = resetLog.format();
-        String out;
-        serializeJson(doc, out);
-        return out;
-    };
-
-    api.onMove = [](float x, float y, bool snap) -> bool {
-        seqActive = false;
-        doMoveCommand(x, y, snap);
-        return true;
-    };
-
-    api.onPeek = [](const String& target) -> bool {
-        seqActive = false;
-        Command::Peek p;
-        if (target == "left")        p = Command::Peek::LEFT;
-        else if (target == "right")  p = Command::Peek::RIGHT;
-        else if (target == "top")    p = Command::Peek::TOP;
-        else if (target == "hide")   p = Command::Peek::HIDE;
-        else return false;
-        doPeekCommand(p);
-        return true;
-    };
-
-    api.onRamp = [](float rate) -> bool {
-        maxRateUsPerSec = ServoSpeed::clampRate(rate);
-        saveMaxRate();
-        return true;
-    };
-
-    api.onSpeed = [](float percent) -> bool {
-        servoSpeedPercent = ServoSpeed::clampPercent(percent);
-        return true;
-    };
-
-    api.onStop = []() -> bool {
-        autoActive = false;
-        randomActive = false;
-        playbackActive = false;
-        recActive = false;
-        setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
-        return true;
-    };
-
-    api.onRandom = [](bool enabled) -> bool {
-        if (enabled) {
-            startRandomMode();
-        } else {
-            randomActive = false;
-            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
-        }
-        return true;
-    };
-
-    api.onWifi = [](const String& mode) -> bool {
-        wifiMode = wifiModeFromString(mode.c_str());
-        saveWifiMode();
-        applyWifiMode();
-        return true;
-    };
-
-    api.onSequenceGet = []() -> String {
-        return String(Sequence::toJson(currentSequence).c_str());
-    };
-
-    api.onSequenceSet = [](const String& json) -> bool {
-        Sequence parsed;
-        std::string err;
-        if (!Sequence::fromJson(json.c_str(), parsed, &err)) {
-            return false;
-        }
-        currentSequence = parsed;
-        saveSequence();
-        return true;
-    };
-
-    api.onRun = []() -> bool {
-        if (seqActive) {
-            seqActive = false;
-            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
-        } else {
-            startSequence();
-        }
-        return true;
-    };
-}
-
 void handleLine(const char* line) {
     // Beim ersten Befehl nach einem Boot die Reset-Diagnose automatisch melden,
     // damit sie im Test-GUI sichtbar wird, ohne einen Monitor anschliessen zu muessen.
@@ -1059,18 +850,6 @@ void handleLine(const char* line) {
             break;
         }
 
-        case Command::Type::WIFI: {
-            if (!cmd.wifiMode.empty()) {
-                wifiMode = wifiModeFromString(cmd.wifiMode.c_str());
-                saveWifiMode();
-                applyWifiMode();
-            }
-            char buf[48];
-            snprintf(buf, sizeof(buf), "WIFI %s", wifiModeToString(wifiMode));
-            ble.sendLine(buf);
-            break;
-        }
-
         default:
             break;
     }
@@ -1080,7 +859,6 @@ void handleLine(const char* line) {
 void setup() {
     resetLog.recordBoot();   // Reset-Grund persistent in NVS aufzeichnen (als Erstes)
     loadMaxRate();           // Strombegrenzung aus NVS laden
-    loadWifiMode();          // WiFi-Modus aus NVS laden
 
     Serial.begin(115200);
     Serial.printf("Reset-Grund: %s (boot=%u)\n",
@@ -1091,9 +869,6 @@ void setup() {
         Serial.println("LittleFS mount fehlgeschlagen");
     }
     loadSequence();
-
-    setupApiCallbacks();
-    applyWifiMode();         // startet ggf. WiFi-AP + HTTP-Server
 
     // Servo-Kalibrierung (am Modell verifiziert):
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
@@ -1127,10 +902,6 @@ void setup() {
 }
 
 void loop() {
-    if (apiStarted) {
-        api.handle();   // HTTP-Requests bedienen (jede Iteration)
-    }
-
     // 50-Hz-Schleife (nicht-blockierend)
     static uint32_t prev = millis();
     const uint32_t now = millis();
@@ -1160,16 +931,6 @@ void loop() {
 
     // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
     updateServoRamp(dt);
-
-    // WiFi-Auto-Modus: erst abschalten, wenn laenger kein Client verbunden ist
-    // (waehrend aktiver Nutzung der Web-UI bleibt der AP an).
-    if (wifiMode == WifiMode::AUTO && WiFi.getMode() == WIFI_AP) {
-        if (WiFi.softAPgetStationNum() > 0) {
-            wifiLastClientMs = millis();
-        } else if (millis() - wifiLastClientMs > WIFI_AUTO_TIMEOUT_MS) {
-            WiFi.mode(WIFI_OFF);
-        }
-    }
 
     // Wegpunkt-Fortschritt: erst wenn die Rampe den aktuellen Punkt erreicht hat.
     if (wpActive && outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {

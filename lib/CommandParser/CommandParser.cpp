@@ -135,15 +135,6 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
-    if (equalsIgnoreCase(keyword, "WIFI")) {
-        out.type = Command::Type::WIFI;
-        char* vs = std::strtok(nullptr, " \t\r\n");
-        if (vs != nullptr) {
-            out.wifiMode = vs;
-        }
-        return true;
-    }
-
     if (equalsIgnoreCase(keyword, "RANDOM")) {
         out.type = Command::Type::RANDOM;
         return true;

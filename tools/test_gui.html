@@ -71,16 +71,6 @@
 
 <hr>
 <div>
-  <h3>WiFi (Web-UI)</h3>
-  <button id="wifiOn">WIFI an</button>
-  <button id="wifiAuto">WIFI auto</button>
-  <button id="wifiOff">WIFI aus</button>
-  <span id="wifiStatus" class="hint"></span>
-  <p class="hint">WIFI an = Access Point "GrabGeist" starten, dann im Browser http://192.168.4.1 öffnen.</p>
-</div>
-
-<hr>
-<div>
   <h3>Direkte Servo-Steuerung (RAW, voller 270&deg;-Bereich)</h3>
   <div class="row">
     <label><input type="checkbox" id="showPos" checked> Position anzeigen</label>
@@ -112,7 +102,6 @@ const rampSlider = document.getElementById('ramp');
 const rampVal = document.getElementById('rampVal');
 const speedSlider = document.getElementById('speed');
 const speedVal = document.getElementById('speedVal');
-const wifiStatus = document.getElementById('wifiStatus');
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 
@@ -196,8 +185,6 @@ function handleRxLine(line) {
     const v = Math.round(+line.split(' ')[1]);
     speedSlider.value = v;
     speedVal.textContent = v;
-  } else if (line.startsWith('WIFI ')) {
-    wifiStatus.textContent = 'Modus: ' + line.slice(5);
   } else if (line.startsWith('RANDOM ')) {
     status.textContent = line;
   } else if (line.startsWith('REC ')) {
@@ -282,9 +269,6 @@ document.getElementById('rampReset').onclick = () => {
 };
 speedSlider.oninput = () => { speedVal.textContent = speedSlider.value; };
 speedSlider.onchange = () => send(`SPEED ${speedSlider.value}`);
-document.getElementById('wifiOn').onclick = () => send('WIFI on');
-document.getElementById('wifiAuto').onclick = () => send('WIFI auto');
-document.getElementById('wifiOff').onclick = () => send('WIFI off');
 document.getElementById('auto').onclick = () => send('AUTO');
 document.getElementById('random').onclick = () => send('RANDOM');
 document.getElementById('rec').onclick = () => send('REC');

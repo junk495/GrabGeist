@@ -55,6 +55,7 @@ void BleUart::begin(const char* deviceName) {
     // Bluetooth in tools/test_gui.html), finden das Geraet dann nicht.
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->addServiceUUID(SERVICE_UUID);
+    advertising->setName(deviceName);   // Name ins Advertising (fuer die Geraeteliste)
     advertising->start();
     serverCallbacks->advertising = advertising;
 }

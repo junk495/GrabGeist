@@ -66,12 +66,8 @@ RAMP [<us/s>]              # Servo-Rampe setzen/abfragen
 SPEED [<%>]                # Geschwindigkeit setzen/abfragen (skaliert unter der Rampe)
 RESETLOG                   # Grund des letzten Resets ausgeben
 MAP                        # Arbeitsraum-Karte anfordern
-WIFI <on|off|auto>         # WiFi-SoftAP (Web-UI) steuern
 
-# Abläufe (Sequenzen) werden über die JSON-API der Web-UI editiert:
-#   GET/POST /api/sequence  (JSON-Ablauf laden/speichern, persistent in /sequence.json)
-#   POST      /api/run      (Ablauf abspielen)
-#   GET       /api/map, /api/status, /api/presets, /api/config
+# Abläufe (Sequenzen): kommen über BLE (SEQ_GET/SEQ_SET/SEQ_RUN, in Arbeit).
 ```
 
 **Konsequenz für die Firmware:**
@@ -111,7 +107,7 @@ Hinweise:
 2. **Phase 2:** **BLE-UART** fürs Handy (Moduswahl + Parameter).
 3. **Phase 3 (optional):** analoger **Joystick** (MANUAL/Sweep, RECORD) und/oder Web-UI.
 
-**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), **WiFi-SoftAP + JSON-API** (`src/ApiServer`, Web-UI `data/index.html`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `ServoSpeed` (Servo-Rampe/Strombegrenzung), **Reset-Log (NVS)**, **Sequence** (JSON-Ablauf, persistent in `/sequence.json`) sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1).
+**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`, NimBLE), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `ServoSpeed` (Servo-Rampe/Strombegrenzung), **Reset-Log (NVS)**, **Sequence** (JSON-Ablauf, persistent in `/sequence.json`) sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1).
 
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 

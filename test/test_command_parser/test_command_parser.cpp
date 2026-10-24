@@ -129,17 +129,6 @@ void test_speed(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 100.0f, c.speed);
 }
 
-void test_wifi(void) {
-    Command c;
-    TEST_ASSERT_TRUE(CommandParser::parse("WIFI off", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::WIFI);
-    TEST_ASSERT_EQUAL_STRING("off", c.wifiMode.c_str());
-
-    TEST_ASSERT_TRUE(CommandParser::parse("WIFI", c));   // Abfrage ohne Wert
-    TEST_ASSERT_TRUE(c.type == Command::Type::WIFI);
-    TEST_ASSERT_EQUAL_STRING("", c.wifiMode.c_str());
-}
-
 void test_random(void) {
     Command c;
     TEST_ASSERT_TRUE(CommandParser::parse("RANDOM", c));
@@ -173,7 +162,6 @@ int main(void) {
     RUN_TEST(test_resetlog);
     RUN_TEST(test_ramp);
     RUN_TEST(test_speed);
-    RUN_TEST(test_wifi);
     RUN_TEST(test_random);
     RUN_TEST(test_rec_play);
     return UNITY_END();
