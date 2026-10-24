@@ -18,11 +18,7 @@ static Sequence makeFullSequence() {
     st.type = Sequence::StepType::PRESET;
     st.preset.name = "hide";
     st.preset.speed = 100.0f;
-    s.steps.push_back(st);
-
-    st = Sequence::Step{};
-    st.type = Sequence::StepType::DELAY;
-    st.delay.ms = 2000;
+    st.preset.holdMs = 1500;
     s.steps.push_back(st);
 
     st = Sequence::Step{};
@@ -30,10 +26,7 @@ static Sequence makeFullSequence() {
     st.move.x = 0.0f;
     st.move.y = 160.0f;
     st.move.speed = 35.0f;
-    s.steps.push_back(st);
-
-    st = Sequence::Step{};
-    st.type = Sequence::StepType::WAIT;
+    st.move.holdMs = 2500;
     s.steps.push_back(st);
 
     return s;
@@ -57,21 +50,18 @@ void test_roundtrip(void) {
     TEST_ASSERT_EQUAL_UINT32(1, out.version);
     TEST_ASSERT_EQUAL_STRING("Test-Show", out.name.c_str());
     TEST_ASSERT_TRUE(out.loop);
-    TEST_ASSERT_EQUAL_UINT(4u, (unsigned)out.steps.size());
+    TEST_ASSERT_EQUAL_UINT(2u, (unsigned)out.steps.size());
 
     TEST_ASSERT_TRUE(out.steps[0].type == Sequence::StepType::PRESET);
     TEST_ASSERT_EQUAL_STRING("hide", out.steps[0].preset.name.c_str());
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 100.0f, out.steps[0].preset.speed);
+    TEST_ASSERT_EQUAL_UINT32(1500, out.steps[0].preset.holdMs);
 
-    TEST_ASSERT_TRUE(out.steps[1].type == Sequence::StepType::DELAY);
-    TEST_ASSERT_EQUAL_UINT32(2000, out.steps[1].delay.ms);
-
-    TEST_ASSERT_TRUE(out.steps[2].type == Sequence::StepType::MOVE);
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out.steps[2].move.x);
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 160.0f, out.steps[2].move.y);
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 35.0f, out.steps[2].move.speed);
-
-    TEST_ASSERT_TRUE(out.steps[3].type == Sequence::StepType::WAIT);
+    TEST_ASSERT_TRUE(out.steps[1].type == Sequence::StepType::MOVE);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out.steps[1].move.x);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 160.0f, out.steps[1].move.y);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 35.0f, out.steps[1].move.speed);
+    TEST_ASSERT_EQUAL_UINT32(2500, out.steps[1].move.holdMs);
 }
 
 void test_speed_clamp(void) {

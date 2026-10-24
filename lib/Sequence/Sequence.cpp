@@ -67,12 +67,6 @@ bool Sequence::validate(Sequence& seq, std::string* error) {
                 }
                 step.preset.speed = clampSpeed(step.preset.speed);
                 break;
-
-            case StepType::DELAY:
-                break;
-
-            case StepType::WAIT:
-                break;
         }
     }
     return true;
@@ -124,15 +118,12 @@ bool Sequence::fromJson(const char* json, Sequence& out, std::string* error) {
             step.move.x = s["x"] | 0.0f;
             step.move.y = s["y"] | 0.0f;
             step.move.speed = s["speed"] | 100.0f;
+            step.move.holdMs = s["holdMs"] | 0u;
         } else if (std::strcmp(type, "preset") == 0) {
             step.type = StepType::PRESET;
             step.preset.name = s["name"] | "";
             step.preset.speed = s["speed"] | 100.0f;
-        } else if (std::strcmp(type, "delay") == 0) {
-            step.type = StepType::DELAY;
-            step.delay.ms = s["ms"] | 0u;
-        } else if (std::strcmp(type, "wait") == 0) {
-            step.type = StepType::WAIT;
+            step.preset.holdMs = s["holdMs"] | 0u;
         } else {
             if (error) {
                 *error = std::string("unknown step type: ") + type;
@@ -161,21 +152,14 @@ std::string Sequence::toJson(const Sequence& seq) {
                 o["x"] = step.move.x;
                 o["y"] = step.move.y;
                 o["speed"] = step.move.speed;
+                o["holdMs"] = step.move.holdMs;
                 break;
 
             case StepType::PRESET:
                 o["type"] = "preset";
                 o["name"] = step.preset.name;
                 o["speed"] = step.preset.speed;
-                break;
-
-            case StepType::DELAY:
-                o["type"] = "delay";
-                o["ms"] = step.delay.ms;
-                break;
-
-            case StepType::WAIT:
-                o["type"] = "wait";
+                o["holdMs"] = step.preset.holdMs;
                 break;
         }
     }

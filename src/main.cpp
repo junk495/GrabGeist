@@ -675,10 +675,17 @@ static void updateSequence() {
     const uint32_t now = millis();
 
     if (seqWait == SeqWait::DELAY) {
+        // Haltezeit laeuft noch.
         if (now - seqWaitStart < seqWaitMs) return;
         seqWait = SeqWait::NONE;
     } else if (seqWait == SeqWait::ARRIVAL) {
+        // Auf Ankunft warten, danach ggf. die Haltezeit starten.
         if (wpActive || outputPulseL != desiredPulseL || outputPulseR != desiredPulseR) return;
+        if (seqWaitMs > 0) {
+            seqWaitStart = now;
+            seqWait = SeqWait::DELAY;
+            return;
+        }
         seqWait = SeqWait::NONE;
     }
 
@@ -695,6 +702,7 @@ static void updateSequence() {
         case Sequence::StepType::MOVE:
             servoSpeedPercent = step.move.speed;
             doMoveCommand(step.move.x, step.move.y, false);
+            seqWaitMs = step.move.holdMs;
             seqWait = SeqWait::ARRIVAL;
             return;
 
@@ -706,19 +714,10 @@ static void updateSequence() {
             else if (step.preset.name == "hide")  p = Command::Peek::HIDE;
             else return;
             doPeekCommand(p);
+            seqWaitMs = step.preset.holdMs;
             seqWait = SeqWait::ARRIVAL;
             return;
         }
-
-        case Sequence::StepType::DELAY:
-            seqWaitMs = step.delay.ms;
-            seqWaitStart = now;
-            seqWait = SeqWait::DELAY;
-            return;
-
-        case Sequence::StepType::WAIT:
-            seqWait = SeqWait::ARRIVAL;
-            return;
     }
 }
 
