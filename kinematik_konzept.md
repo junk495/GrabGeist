@@ -40,7 +40,7 @@ Die Over-Center-Lösung (>180° bzw. negativ) erschließt die **unteren seitlich
 Der IK-Solver (`bool calculateIK(...)`) muss ungültige/kollidierende Koordinaten mit `false` ablehnen:
 1. **Reichweite:**  |L1 − L2| + ε < d < (L1 + L2) − ε ,  mit ε ≈ 5 mm  (→ 40…210 mm)
 2. **acos-Domäne:** Argument vor `acos()` strikt auf [−1, 1] clampen.
-3. **Servo-Grenzen:**  θ_L ∈ [27.9°, 297.9°] ,  θ_R ∈ [−113.85°, 156.15°]  (aus Kalibrierung, am Modell verifizieren!)
+3. **Servo-Grenzen:**  θ_L ∈ [27.9°, 297.9°] ,  θ_R ∈ [−113.85°, 156.15°]  (aus Kalibrierung, am Modell verifiziert)
 4. **Zentrale Sperrzone (Servogehäuse):** P darf nicht in [−45, +45] × [−60, +20] liegen.
 5. **Link↔Achsen-Clearance:** Kurbeln/Schubstangen halten ≥ 18 mm Abstand zur gegenüberliegenden Servoachse.
 6. **Kein Kreuz/Verklemmen:** Kurbeln kreuzen sich nicht; Ellbogen-Abstand ≥ 30 mm; Stangen kreuzen keine Kurbel.

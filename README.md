@@ -19,8 +19,8 @@ Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) autom
 | Schubstangenlänge `L2` | 125 mm |
 
 - 2× 25kg Digital-RC-Servos (270° Stellbereich)
-- Mechanik konstruiert in Fusion 360 – Servo-Grenzen & Kollisionsparameter sind bis zur
-  finalen Vermessung **Platzhalter** (zentral als anpassbare Konstanten geführt).
+- Servo-Kalibrierung & Kollisionsparameter sind **am Modell verifiziert** (zentral als
+  anpassbare Konstanten geführt).
 
 ## Features
 
@@ -28,10 +28,17 @@ Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) autom
   7 Kollisionsprüfungen
 - **Nierenförmiger Arbeitsraum** – obere Kalotte + untere Seitentaschen, Mitte unten gesperrt
   (Servogehäuse)
-- **Workspace** – Raster-Karte, Snapping auf den nächsten gültigen Punkt, A*-Pfadplanung
+- **Workspace** – Raster-Karte, Snapping auf den nächsten gültigen Punkt, A*-Pfadplanung mit
+  automatischem Sicherheitsabstand zur Sperrzone
 - **Tap-to-Move** – Web-Bluetooth-Oberfläche rendert die Karte; Antippen = Zielposition
+- **Servo-Anfahrrampe** – einstellbare Beschleunigungs-/Geschwindigkeitsbegrenzung
+  (verhindert Stromspitzen/Brownouts)
 - **Hysterese** – verhindert Konfigurationssprünge der Servos während der Bewegung
-- **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `MAP`, …)
+- **Betriebsmodi** – `AUTO` (fester Ablauf), `RANDOM` (zufälliges Hervorschauen),
+  `REC`/`PLAY` (Aufnahme & Wiedergabe), Script-Abläufe als Datei
+- **Reset-Diagnose** – Reset-Grund wird persistent in NVS gespeichert und per BLE abrufbar
+- **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `RANDOM`, `RAMP`,
+  `REC`, `PLAY`, `RUN`, …)
 
 ## Tech-Stack
 
@@ -53,6 +60,13 @@ pio test -e test              # Unit-Tests (nativ)
 2. `tools/test_gui.html` im Browser öffnen (Android: Chrome, Web Bluetooth).
 3. „Verbinden" → Gerät **„GrabGeist"** wählen.
 4. Auf die grüne Karte tippen → der Geist fährt dorthin (der ESP32 sucht den Weg um die Sperrzone).
+5. Weitere Bedienelemente:
+   - **Peek-Buttons** (`Links`, `Rechts`, `Beide oben`, `Versteckt`) und **STOP**
+   - **AUTO** (fester Ablauf) und **Zufall** (autonomes Hervorschauen)
+   - **Servo-Tempo** (Anfahrrampe, live einstellbar)
+   - **Aufnahme / Abspielen** (Bewegung aufnehmen und als Schleife abspielen)
+   - **Script** (Ablauf als `.txt`-Datei hochladen und abspielen)
+   - **Reset-Log** (Grund des letzten Resets anzeigen)
 
 ## Dokumentation
 
@@ -61,6 +75,20 @@ pio test -e test              # Unit-Tests (nativ)
 | `SystemSpecification.md` | autoritative Spezifikation |
 | `kinematik_konzept.md` | IK-Briefing (Formeln, Beispiele) |
 | `steuerung_konzept.md` | Steuerungskonzept (Tasten/BLE/Joystick) |
+| `verkabelung.md` | Verkabelung & Stromversorgung |
+
+## Roadmap
+
+Ideen für die nächsten Schritte (noch nicht umgesetzt):
+
+- **Persistenz + Auto-Start (NVS)** – Script, Parameter und aktiver Modus überleben einen
+  Neustart; optional Autostart für den Standalone-Betrieb ohne Handy.
+- **Bewegungsauslöser (PIR-Sensor)** – Geist reagiert auf Näherung.
+- **Physische Taste(n)** – „Verstecken/Stopp" (blind bedienbar) und ggf. Peek-Tasten.
+- **Parameter-Persistenz (NVS)** – Rampe/Zufalls-Dauern speichern.
+- **JSON-Script-Format** – strukturierte Abläufe statt Zeilen-Befehlen.
+- **GUI-Ausbau** – Modus-Anzeige, Live-Position, Rampe-Synchronisation.
+- **Cleanup** – toten Code entfernen, optional `ModeManager` zur Strukturierung.
 
 ## Lizenz
 

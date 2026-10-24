@@ -25,6 +25,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 ## Verzeichnisstruktur
 - `src/main.cpp` — Arduino-Sketch (Einstieg, `setup()`/`loop()`, 50-Hz-Loop)
 - `src/BleUart.{h,cpp}` — BLE-UART (Nordic-UART-Service) für die Handy-Teststeuerung (ESP32-spezifisch)
+- `src/ResetLog.{h,cpp}` — persistente Reset-Diagnose (NVS) (ESP32-spezifisch)
 - `lib/Kinematics/` — inverse Kinematik (pur, hardwarefrei)
 - `lib/ServoController/` — Kurbelwinkel → PWM-Pulsbreite
 - `lib/MotionPlanner/` — nicht-blockierende Bahnplanung (Sprung/Sweep)

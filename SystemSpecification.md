@@ -53,7 +53,7 @@ Der Nutzer bzw. das System gibt die gewünschten kartesischen Koordinaten $(X, Y
   - Linker Servo $S_L = (-D/2, 0) = (-32.5, 0)$
   - Rechter Servo $S_R = (+D/2, 0) = (+32.5, 0)$
 - **Aktoren:** 2× 25kg Digital-RC-Servos (270° Stellbereich, PWM 50Hz–330Hz, Impulsbreite 500µs–2500µs).
-- **Servo-Winkelgrenzen** (aus Kalibrierung abgeleitet, am fertigen Modell VERIFIZIEREN):
+- **Servo-Winkelgrenzen** (aus Kalibrierung abgeleitet, am Modell verifiziert):
   - $\theta_L \in [27.9°, 297.9°]$ ,  $\theta_R \in [-113.85°, 156.15°]$
 - **Kollisions-Parameter** (am Modell ERPROBEN):
   - Zentrale Sperrzone (Servogehäuse): $X \in [-45, +45]$ mm , $Y \in [-60, +20]$ mm
@@ -102,7 +102,7 @@ Der IK-Löser (`bool calculateIK(...)`) MUSS ungültige/kollidierende Koordinate
    $$\vert{}L_1 - L_2\vert{} + \epsilon < d_{L,R} < (L_1 + L_2) - \epsilon$$
    (Sicherheitsabstand $\epsilon \approx 5\text{ mm}$ → $40\ldots 210$ mm).
 2. **Kosinus-Domänen-Clamping:** Argumente für `acos()` strikt in $[-1.0, 1.0]$ halten.
-3. **Servo-Winkelgrenzen:**  $\theta_L \in [27.9°, 297.9°]$ ,  $\theta_R \in [-113.85°, 156.15°]$  (aus Kalibrierung, am Modell verifizieren).
+3. **Servo-Winkelgrenzen:**  $\theta_L \in [27.9°, 297.9°]$ ,  $\theta_R \in [-113.85°, 156.15°]$  (aus Kalibrierung, am Modell verifiziert).
 4. **Zentrale Sperrzone (Servogehäuse):**  $P$ darf nicht in $X \in [-45, +45]$ , $Y \in [-60, +20]$ liegen.
 5. **Link↔Achsen-Clearance:**  Kurbeln/Schubstangen halten ≥ 18 mm Abstand zur gegenüberliegenden Servoachse.
 6. **Kein Kreuz/Verklemmen:**  Kurbeln kreuzen sich nicht; Ellbogen-Abstand ≥ 30 mm; Schubstangen kreuzen keine Kurbel.
@@ -138,5 +138,9 @@ Aus den 7 Prüfungen ergibt sich ein **nierenförmiger** Arbeitsraum: große obe
    - `RECORD_PLAYBACK`: Ringpuffer/Array zur Aufzeichnung von $(X, Y)$-Koordinaten in festen Zeitabständen (z.B. 20Hz) und deren Wiedergabe als Schleife.
    - `RANDOM`: Zustandsmaschine, die zufällig gültige Presets wählt (Versteckt, Links Peek, Rechts Peek, Oben Peek) mit zufälligen Halte- und Versteck-Dauern.
    - `PRESET`: Fest kodierte Trajektorien (Sweep links–rechts, Pop-out und zurück).
+      → Umsetzung: ersetzt durch das **Script-System** (Ablauf als Textdatei hochladen, mit `RUN` abspielen).
+
+> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe und ein Reset-Log (NVS). `PRESET` ist durch Scripts ersetzt.
+
 
 

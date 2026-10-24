@@ -137,6 +137,9 @@ static ScriptWait scriptWait = ScriptWait::NONE;
 static uint32_t   scriptWaitStart = 0;
 static uint32_t   scriptWaitMs = 0;
 
+static const uint32_t SCRIPT_LOAD_TIMEOUT_MS = 5000;
+static uint32_t scriptLoadingStart = 0;
+
 // ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
     const uint32_t duty = (uint32_t)pulseUs * SERVO_DUTY_FS / SERVO_PERIOD_US;
@@ -690,6 +693,7 @@ void handleLine(const char* line) {
         scriptLines.clear();
         scriptActive = false;
         scriptLoading = true;
+        scriptLoadingStart = millis();
         ble.sendLine("SCRIPT loading");
         return;
     }
@@ -890,6 +894,14 @@ void loop() {
 
     // Aufnahme (passiv): aktuelles Servo-Ziel in festem Takt abtasten.
     updateRecording();
+
+    // Script-Upload nicht ewig im Lade-Modus haengen lassen.
+    if (scriptLoading && (millis() - scriptLoadingStart > SCRIPT_LOAD_TIMEOUT_MS)) {
+        scriptLoading = false;
+        if (!mapSending) {
+            ble.sendLine("SCRIPT timeout");
+        }
+    }
 
     // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
     updateServoRamp(dt);

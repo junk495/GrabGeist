@@ -51,18 +51,27 @@ Ein Befehl pro Zeile (ASCII, Zeilenumbruch-terminiert). Wird **identisch** über
 Serial (Debug) und BLE-UART verarbeitet. Tasten/Joystick erzeugen intern dieselben Befehle.
 
 ```
-MODE RANDOM                # autonomer Zufallsmodus (Presets + zufällige Dauern)
-MODE MANUAL                # direkte Position via MOVE
-MODE PRESET                # feste Trajektorien (Sweep, Pop-out, ...)
-MODE RECORD                # Aufnahme vorbereiten
-
-MOVE <x> <y> [smooth|snap] # Zielposition in mm (Default: smooth)
-PEEK <left|right|top|hide> # Preset-Kurzformen (ruft MOVE mit vordefinierten Koordinaten auf)
-
-RECORD <start|stop|play>   # Aufnahme (20 Hz) bzw. Wiedergabe als Schleife
-PARAM <key> <value>        # z.B. PARAM hold_min 1.0, PARAM sweep_speed 2.0
+MOVE <x> <y> [snap]        # Zielposition in mm (Default: smooth + A*-Pfad)
+PEEK <left|right|top|hide> # Preset-Kurzformen
+RAW <l> <r>                # direkte Servo-Pulsbreiten [us] (500..2500)
 STOP                       # sofort verstecken / anhalten
-STATUS                     # aktueller Zustand ausgeben (Mode, Position)
+STATUS                     # aktueller Zustand ausgeben
+
+AUTO                       # fester Ablauf (links -> oben -> rechts -> versteckt)
+RANDOM                     # autonomer Zufallsmodus (toggle)
+REC                        # Aufnahme starten/stoppen (20 Hz)
+PLAY                       # Aufnahme als Schleife abspielen (toggle)
+
+RAMP [<us/s>]              # Servo-Rampe setzen/abfragen
+RESETLOG                   # Grund des letzten Resets ausgeben
+MAP                        # Arbeitsraum-Karte anfordern
+
+# Script (Ablauf als Datei hochladen und abspielen):
+SCRIPT_CLEAR               # Upload starten (folgende Zeilen werden gesammelt)
+SCRIPT_END                 # Upload beenden
+RUN                        # Script abspielen (Schleife, toggle)
+DELAY <ms>                 # innerhalb eines Scripts: warten
+WAIT                       # innerhalb eines Scripts: auf Ankunft warten
 ```
 
 **Konsequenz für die Firmware:**
@@ -102,7 +111,7 @@ Hinweise:
 2. **Phase 2:** **BLE-UART** fürs Handy (Moduswahl + Parameter).
 3. **Phase 3 (optional):** analoger **Joystick** (MANUAL/Sweep, RECORD) und/oder Web-UI.
 
-**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A*) und **Tap-to-Move** (Karte rendern + Antippen; `MOVE` wird über den `Workspace` geroutet, Karte via `MAP`-Befehl übertragen) sind umgesetzt. Es fehlen noch: `ModeManager`/Tasten sowie die Modi `RANDOM`/`RECORD`/`PRESET`.
+**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `MotionPlanner` (konstante Bahngeschwindigkeit), **Servo-Rampe**, **Reset-Log (NVS)** sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` und **Script-Upload/-Ablauf** sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1) sowie `PRESET`-Choreografien (inzwischen durch das Script-System ersetzt).
 
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 

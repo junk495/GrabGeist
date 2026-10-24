@@ -117,8 +117,8 @@ let mapRetries = 0;   // Anzahl der Neu-Anforderungen
 let lastRawInteract = 0;   // Zeitstempel der letzten manuellen RAW-Slider-Bedienung
 
 function send(line) {
-  if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
-  rxChar.writeValue(new TextEncoder().encode(line + '\n'));
+  if (!rxChar) { status.textContent = 'Erst verbinden!'; return Promise.resolve(); }
+  return rxChar.writeValue(new TextEncoder().encode(line + '\n'));
 }
 
 function renderMap() {
@@ -276,22 +276,23 @@ document.getElementById('rec').onclick = () => send('REC');
 document.getElementById('play').onclick = () => send('PLAY');
 document.getElementById('run').onclick = () => send('RUN');
 
-function uploadScript() {
+async function uploadScript() {
   const file = document.getElementById('scriptFile').files[0];
   if (!file) { status.textContent = 'Erst Datei wählen'; return; }
   if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
-  const reader = new FileReader();
-  reader.onload = () => {
-    const lines = String(reader.result).split(/\r?\n/);
+  try {
+    const text = await file.text();
+    const lines = text.split(/\r?\n/);
     status.textContent = 'Script wird gesendet...';
-    send('SCRIPT_CLEAR');
+    await send('SCRIPT_CLEAR');
     for (const raw of lines) {
       const line = raw.trim();
-      if (line.length > 0) send(line);
+      if (line.length > 0) await send(line);
     }
-    send('SCRIPT_END');
-  };
-  reader.readAsText(file);
+    await send('SCRIPT_END');
+  } catch (err) {
+    status.textContent = 'Upload-Fehler: ' + err;
+  }
 }
 document.getElementById('scriptUpload').onclick = uploadScript;
 document.querySelectorAll('button[data-cmd]').forEach(b => {

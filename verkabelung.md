@@ -132,12 +132,12 @@ PWM-Parameter (LEDC): **50 Hz**, **16 Bit** Auflösung, Pulsbreite **500–2500 
 
 ## 8. Nächste Schritte (Checkliste Probeaufbau)
 
-- [ ] DPS150 auf CV 7,0 V / CC 5 A eingestellt (vor dem Anschließen)
-- [ ] Gemeinsame Masse (ESP32-GND ↔ DPS150-Minus) hergestellt
-- [ ] Signal auf GPIO4 (links) / GPIO5 (rechts) geprüft
-- [ ] Servos ohne Gestänge an `pio run -e esp32s3 -t upload` getestet
-- [ ] Nullpunkt-/Richtungs-Kalibrierung in `src/main.cpp` gesetzt
-- [ ] Gestänge montiert, Bewegung der Demo-Punkte (versteckt / Links-/Rechts-/Oben-Peek) beobachtet
+- [x] DPS150 auf CV 7,0 V / CC 5 A eingestellt (vor dem Anschließen)
+- [x] Gemeinsame Masse (ESP32-GND ↔ DPS150-Minus) hergestellt
+- [x] Signal auf GPIO4 (links) / GPIO5 (rechts) geprüft
+- [x] Servos ohne Gestänge an `pio run -e esp32s3 -t upload` getestet
+- [x] Nullpunkt-/Richtungs-Kalibrierung in `src/main.cpp` gesetzt (am Modell verifiziert)
+- [x] Gestänge montiert, Bewegung der Demo-Punkte (versteckt / Links-/Rechts-/Oben-Peek) beobachtet
 
 ## 9. Ausblick: Realbetrieb (ESP über Step-Down)
 
@@ -164,4 +164,17 @@ DPS150 @ 7,0 V
 - [ ] Buck-Ausgang an ESP32 **5V-Pin**, Buck-Minus an gemeinsame Masse
 - [ ] Im Realbetrieb kein USB angeschlossen (nur zum Flashen)
 - [ ] Spannungen mit Multimeter geprüft: 7,0 V (Servos), 5,0 V (ESP), gemeinsame Masse
+
+## 11. LiPo-Betrieb (aktueller Stand)
+
+Der Aufbau läuft inzwischen mit **LiPo** statt DPS150. Wichtig dabei:
+
+- **Versorgung:** 2S-LiPo (voll ~8,4 V, leer ~6,0–6,6 V). Servos direkt am LiPo (4,8–8,4 V),
+  ESP32 über einen **5V-Buck (LM2596)** am 5V-Pin.
+- **Spannungsreserve:** Bei ~7 V am LM2596 ist der Dropout knapp; Servo-Lastspitzen können die
+  5V-Schiene kurz einbrechen lassen → **Brownout**. Abhilfe:
+  - Stützkondensatoren am Buck-Eingang und -Ausgang (470–1000 µF),
+  - **Servo-Anfahrrampe** begrenzt die Stromspitzen (in `main.cpp`, Befehl `RAMP`).
+- **Gemeinsame Masse** bleibt zwingend (LiPo-Minus ↔ ESP32-GND).
+- **Nie gleichzeitig USB und Buck/LiPo** betreiben.
 
