@@ -126,6 +126,24 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "SPEED")) {
+        out.type = Command::Type::SPEED;
+        char* vs = std::strtok(nullptr, " \t\r\n");
+        if (vs != nullptr) {
+            out.speed = std::strtof(vs, nullptr);
+        }
+        return true;
+    }
+
+    if (equalsIgnoreCase(keyword, "WIFI")) {
+        out.type = Command::Type::WIFI;
+        char* vs = std::strtok(nullptr, " \t\r\n");
+        if (vs != nullptr) {
+            out.wifiMode = vs;
+        }
+        return true;
+    }
+
     if (equalsIgnoreCase(keyword, "RANDOM")) {
         out.type = Command::Type::RANDOM;
         return true;
@@ -138,25 +156,6 @@ bool CommandParser::parse(const char* line, Command& out) {
 
     if (equalsIgnoreCase(keyword, "PLAY")) {
         out.type = Command::Type::PLAY;
-        return true;
-    }
-
-    if (equalsIgnoreCase(keyword, "DELAY")) {
-        out.type = Command::Type::DELAY;
-        char* ms = std::strtok(nullptr, " \t\r\n");
-        if (ms != nullptr) {
-            out.delayMs = static_cast<uint32_t>(std::strtoul(ms, nullptr, 10));
-        }
-        return true;
-    }
-
-    if (equalsIgnoreCase(keyword, "WAIT")) {
-        out.type = Command::Type::WAIT;
-        return true;
-    }
-
-    if (equalsIgnoreCase(keyword, "RUN")) {
-        out.type = Command::Type::RUN;
         return true;
     }
 

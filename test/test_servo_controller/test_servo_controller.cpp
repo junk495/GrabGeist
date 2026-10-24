@@ -49,6 +49,23 @@ void test_pulse_clamp(void) {
     TEST_ASSERT_EQUAL_UINT16(500,  sc.angleToPulseUsLeft(Kinematics::degToRad(-300.0f)));
 }
 
+// Inverse Abbildung: Pulsbreite -> Winkel ist konsistent zur Vorwaerts-Abbildung.
+void test_pulse_angle_roundtrip(void) {
+    ServoController sc;
+    sc.setCalibrationLeft(Kinematics::degToRad(162.90f), false);
+    sc.setCalibrationRight(Kinematics::degToRad(15.75f), false);
+
+    // HIDE-Position (1580 / 1410 us) zurueck auf Winkel abbilden.
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(173.70f), sc.pulseToAngleUsLeft(1580.0f));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(3.60f), sc.pulseToAngleUsRight(1410.0f));
+
+    // Roundtrip: Winkel -> Puls -> Winkel.
+    const float tl = Kinematics::degToRad(120.0f);
+    const float tr = Kinematics::degToRad(60.0f);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, tl, sc.pulseToAngleUsLeft(sc.angleToPulseUsLeft(tl)));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, tr, sc.pulseToAngleUsRight(sc.angleToPulseUsRight(tr)));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_pulse_center);
@@ -57,5 +74,6 @@ int main(void) {
     RUN_TEST(test_pulse_invert);
     RUN_TEST(test_pulse_zero_offset);
     RUN_TEST(test_pulse_clamp);
+    RUN_TEST(test_pulse_angle_roundtrip);
     return UNITY_END();
 }

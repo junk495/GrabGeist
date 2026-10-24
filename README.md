@@ -30,15 +30,17 @@ Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) autom
   (Servogehäuse)
 - **Workspace** – Raster-Karte, Snapping auf den nächsten gültigen Punkt, A*-Pfadplanung mit
   automatischem Sicherheitsabstand zur Sperrzone
-- **Tap-to-Move** – Web-Bluetooth-Oberfläche rendert die Karte; Antippen = Zielposition
+- **Tap-to-Move** – Web-UI (PWA über WiFi-SoftAP) rendert die Karte; Antippen = Zielposition
 - **Servo-Anfahrrampe** – einstellbare Beschleunigungs-/Geschwindigkeitsbegrenzung
   (verhindert Stromspitzen/Brownouts)
 - **Hysterese** – verhindert Konfigurationssprünge der Servos während der Bewegung
 - **Betriebsmodi** – `AUTO` (fester Ablauf), `RANDOM` (zufälliges Hervorschauen),
-  `REC`/`PLAY` (Aufnahme & Wiedergabe), Script-Abläufe als Datei
+  `REC`/`PLAY` (Aufnahme & Wiedergabe)
+- **Ablauf-Editor** – JSON-Sequenzen (Move/Preset/Delay/Wait) über die Web-UI,
+  persistent in `/sequence.json`
 - **Reset-Diagnose** – Reset-Grund wird persistent in NVS gespeichert und per BLE abrufbar
 - **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `RANDOM`, `RAMP`,
-  `REC`, `PLAY`, `RUN`, …)
+  `SPEED`, `WIFI`, `REC`, `PLAY`, …) als Testkanal
 
 ## Tech-Stack
 
@@ -56,16 +58,18 @@ pio test -e test              # Unit-Tests (nativ)
 
 ## Benutzung
 
-1. Firmware auf den ESP32-S3 flashen.
-2. `tools/test_gui.html` im Browser öffnen (Android: Chrome, Web Bluetooth).
-3. „Verbinden" → Gerät **„GrabGeist"** wählen.
-4. Auf die grüne Karte tippen → der Geist fährt dorthin (der ESP32 sucht den Weg um die Sperrzone).
-5. Weitere Bedienelemente:
+1. Firmware und Dateisystem flashen:
+   `pio run -e esp32s3 -t upload` und `pio run -e esp32s3 -t uploadfs`.
+2. Mit dem WiFi-SoftAP **„GrabGeist"** verbinden und im Browser `http://192.168.4.1` öffnen
+   (die Web-UI liegt als PWA in `data/index.html`).
+   Alternativ für die BLE-Teststeuerung: `tools/test_gui.html` öffnen (Android: Chrome, Web Bluetooth).
+3. Auf die grüne Karte tippen → der Geist fährt dorthin (der ESP32 sucht den Weg um die Sperrzone).
+4. Weitere Bedienelemente:
    - **Peek-Buttons** (`Links`, `Rechts`, `Beide oben`, `Versteckt`) und **STOP**
    - **AUTO** (fester Ablauf) und **Zufall** (autonomes Hervorschauen)
    - **Servo-Tempo** (Anfahrrampe, live einstellbar)
    - **Aufnahme / Abspielen** (Bewegung aufnehmen und als Schleife abspielen)
-   - **Script** (Ablauf als `.txt`-Datei hochladen und abspielen)
+   - **Ablauf-Editor** (JSON-Sequenz bauen, speichern, abspielen)
    - **Reset-Log** (Grund des letzten Resets anzeigen)
 
 ## Dokumentation
@@ -81,14 +85,13 @@ pio test -e test              # Unit-Tests (nativ)
 
 Ideen für die nächsten Schritte (noch nicht umgesetzt):
 
-- **Persistenz + Auto-Start (NVS)** – Script, Parameter und aktiver Modus überleben einen
-  Neustart; optional Autostart für den Standalone-Betrieb ohne Handy.
+- **Persistenz + Auto-Start (NVS)** – aktiver Modus überlebt einen Neustart;
+  optional Autostart für den Standalone-Betrieb ohne Handy.
 - **Bewegungsauslöser (PIR-Sensor)** – Geist reagiert auf Näherung.
 - **Physische Taste(n)** – „Verstecken/Stopp" (blind bedienbar) und ggf. Peek-Tasten.
 - **Parameter-Persistenz (NVS)** – Rampe/Zufalls-Dauern speichern.
-- **JSON-Script-Format** – strukturierte Abläufe statt Zeilen-Befehlen.
 - **GUI-Ausbau** – Modus-Anzeige, Live-Position, Rampe-Synchronisation.
-- **Cleanup** – toten Code entfernen, optional `ModeManager` zur Strukturierung.
+- **Cleanup** – weiter toten Code entfernen, optional `ModeManager` zur Strukturierung.
 
 ## Lizenz
 

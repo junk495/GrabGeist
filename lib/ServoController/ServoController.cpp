@@ -43,3 +43,19 @@ uint16_t ServoController::angleToPulseUs(float thetaRad, const Calibration& cal)
 
     return static_cast<uint16_t>(std::round(pulse));
 }
+
+float ServoController::pulseToAngleUsLeft(float pulseUs) const {
+    return pulseToAngleUs(pulseUs, left_);
+}
+
+float ServoController::pulseToAngleUsRight(float pulseUs) const {
+    return pulseToAngleUs(pulseUs, right_);
+}
+
+float ServoController::pulseToAngleUs(float pulseUs, const Calibration& cal) const {
+    float delta = (pulseUs - CENTER_PULSE_US) / US_PER_RAD;
+    if (cal.invert) {
+        delta = -delta;
+    }
+    return cal.zeroOffsetRad + delta;
+}

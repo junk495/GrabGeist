@@ -28,6 +28,11 @@ public:
     uint16_t angleToPulseUsLeft(float thetaRad) const;
     uint16_t angleToPulseUsRight(float thetaRad) const;
 
+    // Inverse Abbildung: Pulsbreite -> Kurbelwinkel [rad]. Ungeklemmt; dient als
+    // Hysterese-Hint, damit die IK weiss, in welcher Konfiguration die Servos sind.
+    float pulseToAngleUsLeft(float pulseUs) const;
+    float pulseToAngleUsRight(float pulseUs) const;
+
 private:
     struct Calibration {
         float zeroOffsetRad = 0.0f;
@@ -35,6 +40,7 @@ private:
     };
 
     uint16_t angleToPulseUs(float thetaRad, const Calibration& cal) const;
+    float pulseToAngleUs(float pulseUs, const Calibration& cal) const;
 
     Calibration left_;
     Calibration right_;

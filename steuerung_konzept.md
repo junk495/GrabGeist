@@ -63,20 +63,20 @@ REC                        # Aufnahme starten/stoppen (20 Hz)
 PLAY                       # Aufnahme als Schleife abspielen (toggle)
 
 RAMP [<us/s>]              # Servo-Rampe setzen/abfragen
+SPEED [<%>]                # Geschwindigkeit setzen/abfragen (skaliert unter der Rampe)
 RESETLOG                   # Grund des letzten Resets ausgeben
 MAP                        # Arbeitsraum-Karte anfordern
+WIFI <on|off|auto>         # WiFi-SoftAP (Web-UI) steuern
 
-# Script (Ablauf als Datei hochladen und abspielen):
-SCRIPT_CLEAR               # Upload starten (folgende Zeilen werden gesammelt)
-SCRIPT_END                 # Upload beenden
-RUN                        # Script abspielen (Schleife, toggle)
-DELAY <ms>                 # innerhalb eines Scripts: warten
-WAIT                       # innerhalb eines Scripts: auf Ankunft warten
+# Abläufe (Sequenzen) werden über die JSON-API der Web-UI editiert:
+#   GET/POST /api/sequence  (JSON-Ablauf laden/speichern, persistent in /sequence.json)
+#   POST      /api/run      (Ablauf abspielen)
+#   GET       /api/map, /api/status, /api/presets, /api/config
 ```
 
 **Konsequenz für die Firmware:**
 - Neues Modul `ModeManager` (bzw. `Command`-Parser) sitzt **über** den bestehenden Klassen
-  (`MotionPlanner`, `Kinematics`, `ServoController`).
+  (`Kinematics`, `ServoController`, `ServoSpeed`).
 - Jede Eingabe (Taste, BLE, Joystick, Web) liefert nur Befehle → Eingaben sind
   austauschbar, ohne die Kernlogik anzufassen.
 
@@ -111,7 +111,7 @@ Hinweise:
 2. **Phase 2:** **BLE-UART** fürs Handy (Moduswahl + Parameter).
 3. **Phase 3 (optional):** analoger **Joystick** (MANUAL/Sweep, RECORD) und/oder Web-UI.
 
-**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `MotionPlanner` (konstante Bahngeschwindigkeit), **Servo-Rampe**, **Reset-Log (NVS)** sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` und **Script-Upload/-Ablauf** sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1) sowie `PRESET`-Choreografien (inzwischen durch das Script-System ersetzt).
+**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`), **WiFi-SoftAP + JSON-API** (`src/ApiServer`, Web-UI `data/index.html`), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `ServoSpeed` (Servo-Rampe/Strombegrenzung), **Reset-Log (NVS)**, **Sequence** (JSON-Ablauf, persistent in `/sequence.json`) sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1).
 
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 

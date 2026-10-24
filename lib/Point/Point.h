@@ -1,5 +1,5 @@
 // Point.h
-// Gemeinsamer 2D-Punkt-Typ (mm) fuer Workspace und MotionPlanner.
+// Gemeinsamer 2D-Punkt-Typ (mm) fuer Workspace und Bahnplanung.
 
 #pragma once
 

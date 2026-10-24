@@ -170,6 +170,14 @@ bool Kinematics::solveAndSelect(float x, float y, bool hasHint, float hintL, flo
             float dist = 0.0f;
             if (hasHint) {
                 dist = std::fabs(angleDiff(nL, hintL)) + std::fabs(angleDiff(nR, hintR));
+                // Gemischte Konfigurationen (ein Arm "Knie nach aussen", der andere
+                // "Over-Center") ergeben denselben Punkt, aber eine schiefe
+                // Geist-Lage. Symmetrische Loesungen bevorzugen; gemischt nur,
+                // wenn es keine symmetrische gueltige Loesung gibt (z.B. untere
+                // Seitentaschen).
+                if (i != j) {
+                    dist += kTwoPi;   // groesser als jede moegliche Winkeldifferenz
+                }
             }
             if (!found || dist < bestDist) {
                 found = true;

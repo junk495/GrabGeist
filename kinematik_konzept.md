@@ -63,7 +63,7 @@ Der IK-Solver (`bool calculateIK(...)`) muss ungültige/kollidierende Koordinate
 1. **`Kinematics`** (hardwarefrei): bimodale IK + Kollisionsfilter + `isReachable(x, y)` + Hysterese.
 2. **`Workspace`** (hardwarefrei): Raster-Karte der erreichbaren Punkte, `nearestValid()` (Snap), `findPath()` (A*).
 3. **`ServoController`**: Servowinkel → PWM (500–2500 µs), mit Kalibrier-Offsets und Invertier-Flags.
-4. **`MotionPlanner`**: nicht-blockierende Bahn (Sprung/Sweep; IK in jedem Zeitschritt).
+4. **`ServoSpeed`**: Servo-Rampe / Strombegrenzung (µs/s) — deckelt die maximale PWM-Änderungsrate.
 5. **`CommandParser`**: Textbefehle → strukturierter `Command`.
 
 ## Rahmen

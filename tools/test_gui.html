@@ -56,22 +56,27 @@
 
 <hr>
 <div>
-  <h3>Script (Ablauf-Datei)</h3>
-  <input type="file" id="scriptFile" accept=".txt">
-  <button id="scriptUpload">Hochladen</button>
-  <button id="run">Abspielen</button>
-  <p class="hint">Zeilen: PEEK / MOVE / RAW / DELAY &lt;ms&gt; / WAIT / #Kommentar &middot; STOP beendet</p>
+  <h3>Geschwindigkeit &amp; Strombegrenzung</h3>
+  <div class="row">
+    <label>Geschwindigkeit (%): <input type="range" id="speed" min="0" max="100" step="5" value="100"></label>
+    <span id="speedVal">100</span>
+  </div>
+  <div class="row">
+    <label>Strombegrenzung (&micro;s/s): <input type="range" id="ramp" min="100" max="3400" step="50" value="1000"></label>
+    <span id="rampVal">1000</span>
+  </div>
+  <button id="rampReset">Standard (1000)</button>
+  <p class="hint">Geschwindigkeit: 100 % = volle Strombegrenzung, 50 % = halb so schnell. Strombegrenzung = Sicherheits-Deckel (wird gespeichert).</p>
 </div>
 
 <hr>
 <div>
-  <h3>Servo-Tempo (Anfahrrampe)</h3>
-  <div class="row">
-    <label>Rampe (&micro;s/s): <input type="range" id="ramp" min="100" max="3500" step="50" value="750"></label>
-    <span id="rampVal">750</span>
-  </div>
-  <button id="rampReset">Standard (750)</button>
-  <p class="hint">klein = sanft &amp; sicher (weniger Stromspitzen), gro&szlig; = schneller. 3500 &asymp; volle Servogeschwindigkeit.</p>
+  <h3>WiFi (Web-UI)</h3>
+  <button id="wifiOn">WIFI an</button>
+  <button id="wifiAuto">WIFI auto</button>
+  <button id="wifiOff">WIFI aus</button>
+  <span id="wifiStatus" class="hint"></span>
+  <p class="hint">WIFI an = Access Point "GrabGeist" starten, dann im Browser http://192.168.4.1 öffnen.</p>
 </div>
 
 <hr>
@@ -105,6 +110,9 @@ const status = document.getElementById('status');
 const resetInfo = document.getElementById('resetInfo');
 const rampSlider = document.getElementById('ramp');
 const rampVal = document.getElementById('rampVal');
+const speedSlider = document.getElementById('speed');
+const speedVal = document.getElementById('speedVal');
+const wifiStatus = document.getElementById('wifiStatus');
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 
@@ -184,15 +192,17 @@ function handleRxLine(line) {
     const v = Math.round(+line.split(' ')[1]);
     rampSlider.value = v;
     rampVal.textContent = v;
+  } else if (line.startsWith('SPEED ')) {
+    const v = Math.round(+line.split(' ')[1]);
+    speedSlider.value = v;
+    speedVal.textContent = v;
+  } else if (line.startsWith('WIFI ')) {
+    wifiStatus.textContent = 'Modus: ' + line.slice(5);
   } else if (line.startsWith('RANDOM ')) {
     status.textContent = line;
   } else if (line.startsWith('REC ')) {
     status.textContent = line;
   } else if (line.startsWith('PLAY ')) {
-    status.textContent = line;
-  } else if (line.startsWith('SCRIPT ')) {
-    status.textContent = line;
-  } else if (line.startsWith('RUN ')) {
     status.textContent = line;
   } else if (line.startsWith('ERR ')) {
     resetInfo.textContent = 'Fehler: ' + line.slice(4) +
@@ -266,35 +276,20 @@ document.getElementById('stop').onclick = () => send('STOP');
 rampSlider.oninput = () => { rampVal.textContent = rampSlider.value; };
 rampSlider.onchange = () => send(`RAMP ${rampSlider.value}`);
 document.getElementById('rampReset').onclick = () => {
-  rampSlider.value = 750;
-  rampVal.textContent = '750';
-  send('RAMP 750');
+  rampSlider.value = 1000;
+  rampVal.textContent = '1000';
+  send('RAMP 1000');
 };
+speedSlider.oninput = () => { speedVal.textContent = speedSlider.value; };
+speedSlider.onchange = () => send(`SPEED ${speedSlider.value}`);
+document.getElementById('wifiOn').onclick = () => send('WIFI on');
+document.getElementById('wifiAuto').onclick = () => send('WIFI auto');
+document.getElementById('wifiOff').onclick = () => send('WIFI off');
 document.getElementById('auto').onclick = () => send('AUTO');
 document.getElementById('random').onclick = () => send('RANDOM');
 document.getElementById('rec').onclick = () => send('REC');
 document.getElementById('play').onclick = () => send('PLAY');
-document.getElementById('run').onclick = () => send('RUN');
 
-async function uploadScript() {
-  const file = document.getElementById('scriptFile').files[0];
-  if (!file) { status.textContent = 'Erst Datei wählen'; return; }
-  if (!rxChar) { status.textContent = 'Erst verbinden!'; return; }
-  try {
-    const text = await file.text();
-    const lines = text.split(/\r?\n/);
-    status.textContent = 'Script wird gesendet...';
-    await send('SCRIPT_CLEAR');
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (line.length > 0) await send(line);
-    }
-    await send('SCRIPT_END');
-  } catch (err) {
-    status.textContent = 'Upload-Fehler: ' + err;
-  }
-}
-document.getElementById('scriptUpload').onclick = uploadScript;
 document.querySelectorAll('button[data-cmd]').forEach(b => {
   b.onclick = () => send(b.dataset.cmd);
 });

@@ -114,6 +114,32 @@ void test_ramp(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 1000.0f, c.ramp);
 }
 
+void test_speed(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("SPEED 50", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::SPEED);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 50.0f, c.speed);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("SPEED", c));   // Abfrage ohne Wert
+    TEST_ASSERT_TRUE(c.type == Command::Type::SPEED);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, -1.0f, c.speed);
+
+    TEST_ASSERT_TRUE(CommandParser::parse("speed 100", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::SPEED);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 100.0f, c.speed);
+}
+
+void test_wifi(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("WIFI off", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::WIFI);
+    TEST_ASSERT_EQUAL_STRING("off", c.wifiMode.c_str());
+
+    TEST_ASSERT_TRUE(CommandParser::parse("WIFI", c));   // Abfrage ohne Wert
+    TEST_ASSERT_TRUE(c.type == Command::Type::WIFI);
+    TEST_ASSERT_EQUAL_STRING("", c.wifiMode.c_str());
+}
+
 void test_random(void) {
     Command c;
     TEST_ASSERT_TRUE(CommandParser::parse("RANDOM", c));
@@ -132,21 +158,6 @@ void test_rec_play(void) {
     TEST_ASSERT_TRUE(c.type == Command::Type::PLAY);
 }
 
-void test_script_commands(void) {
-    Command c;
-    TEST_ASSERT_TRUE(CommandParser::parse("DELAY 1200", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::DELAY);
-    TEST_ASSERT_EQUAL_UINT32(1200, c.delayMs);
-
-    TEST_ASSERT_TRUE(CommandParser::parse("WAIT", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::WAIT);
-
-    TEST_ASSERT_TRUE(CommandParser::parse("RUN", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::RUN);
-    TEST_ASSERT_TRUE(CommandParser::parse("run", c));   // klein geschrieben
-    TEST_ASSERT_TRUE(c.type == Command::Type::RUN);
-}
-
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -161,8 +172,9 @@ int main(void) {
     RUN_TEST(test_auto);
     RUN_TEST(test_resetlog);
     RUN_TEST(test_ramp);
+    RUN_TEST(test_speed);
+    RUN_TEST(test_wifi);
     RUN_TEST(test_random);
     RUN_TEST(test_rec_play);
-    RUN_TEST(test_script_commands);
     return UNITY_END();
 }

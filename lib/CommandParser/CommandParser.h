@@ -5,10 +5,11 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, RANDOM, REC, PLAY, DELAY, WAIT, RUN };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, SPEED, RANDOM, REC, PLAY, WIFI };
     enum class Peek { LEFT, RIGHT, TOP, HIDE };
 
     Type type = Type::NONE;
@@ -18,8 +19,9 @@ struct Command {
     Peek  peek = Peek::HIDE;   // PEEK: Ziel-Preset
     uint16_t rawL = 1500;      // RAW: linker Servo-Puls [us]
     uint16_t rawR = 1500;      // RAW: rechter Servo-Puls [us]
-    float    ramp = -1.0f;     // RAMP: Rate-Limit [us/s]; -1 = nur abfragen
-    uint32_t delayMs = 0;      // DELAY: Wartezeit [ms]
+    float    ramp = -1.0f;     // RAMP: Strombegrenzung [us/s]; -1 = nur abfragen
+    float    speed = -1.0f;    // SPEED: 0..100 %; -1 = nur abfragen
+    std::string wifiMode;      // WIFI: on | off | auto
 };
 
 class CommandParser {

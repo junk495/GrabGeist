@@ -1,21 +1,28 @@
 // main.cpp — GrabGeist Firmware (ESP32-S3)
 //
 // Test-Steuerung ueber BLE (Handy):
-//   BLE -> CommandParser -> MotionPlanner -> Kinematics -> ServoController -> LEDC
+//   BLE -> CommandParser -> Kinematics -> ServoController -> LEDC
+//   (Bewegung: Wegpunkt-Folge + ServoSpeed-Rampe)
 
 #include <Arduino.h>
 #include <esp_random.h>   // esp_random() fuer den Zufallsmodus
+#include <Preferences.h>
+#include <WiFi.h>
+#include <LittleFS.h>
 
+#include <ArduinoJson.h>
 #include <CommandParser.h>
 #include <Kinematics.h>
-#include <MotionPlanner.h>
+#include <Sequence.h>
 #include <ServoController.h>
+#include <ServoSpeed.h>
 #include <Workspace.h>
 
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "ApiServer.h"
 #include "BleUart.h"
 #include "ResetLog.h"
 
@@ -39,14 +46,107 @@ static const uint32_t SERVO_DUTY_FS   = (1u << SERVO_RES_BITS);     // 2^14 = 16
 static const uint32_t LOOP_INTERVAL_MS = 20;   // 50 Hz
 
 // ---------------------------------------------------------------------------
-// Servo-Anfahrrampe (Rate-Limit): maximale Pulsbreiten-Aenderung pro Sekunde [us/s].
-// 500..2500 us entsprechen 270° -> 750 us/s ~ 100°/s Kurbelgeschwindigkeit.
-// Je kleiner, desto sanfter der Anlauf (weniger Stromspitzen beim 5V-/LiPo-Betrieb).
-// 0 = keine Begrenzung (Servos springen sofort). Zur Laufzeit per Befehl "RAMP <us/s>"
-// aenderbar ("RAMP" ohne Wert fragt den aktuellen Wert ab).
+// Strombegrenzung (intern): hoechste erlaubte Puls-Slew-Rate [us/s].
+// Sicherheits-Deckel gegen Stromspitzen/Brownout; wird dauerhaft in NVS gespeichert.
+// Befehl "RAMP <us/s>" setzt den Wert ("RAMP" fragt ab).
 // ---------------------------------------------------------------------------
-static constexpr float SERVO_RAMP_US_PER_S_DEFAULT = 750.0f;
-static float servoRampUsPerS = SERVO_RAMP_US_PER_S_DEFAULT;
+static float maxRateUsPerSec = ServoSpeed::DEFAULT_LIMIT_US_PER_S;
+
+// Geschwindigkeit der aktuellen Bewegung: 0..100 % der Strombegrenzung.
+// 100 % = volle Strombegrenzung; 50 % = halb so schnell.
+// Befehl "SPEED <pct>" setzt den Standardwert ("SPEED" fragt ab).
+static float servoSpeedPercent = 100.0f;
+
+// ---------------------------------------------------------------------------
+// Strombegrenzung dauerhaft speichern/laden (NVS).
+// ---------------------------------------------------------------------------
+static const char* kPrefsNamespace = "grabgeist";
+
+static void loadMaxRate() {
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    maxRateUsPerSec = prefs.getFloat("maxRate", ServoSpeed::DEFAULT_LIMIT_US_PER_S);
+    prefs.end();
+    maxRateUsPerSec = ServoSpeed::clampRate(maxRateUsPerSec);
+}
+
+static void saveMaxRate() {
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, false);
+    prefs.putFloat("maxRate", maxRateUsPerSec);
+    prefs.end();
+}
+
+static ApiServer api;
+
+// ---------------------------------------------------------------------------
+// WiFi (SoftAP) fuer die Web-UI. Modus in NVS gespeichert: on / off / auto.
+// ---------------------------------------------------------------------------
+enum class WifiMode { OFF, ON, AUTO };
+static WifiMode  wifiMode = WifiMode::AUTO;   // Standard: auto (AP beim Boot an, nach 3 min ohne Client aus)
+static uint32_t  wifiStartMs = 0;
+static uint32_t  wifiLastClientMs = 0;
+static bool      wifiStarted = false;
+static bool      apiStarted = false;
+static const uint32_t WIFI_AUTO_TIMEOUT_MS = 180000;   // 3 min
+
+static WifiMode wifiModeFromString(const char* s) {
+    if (std::strcmp(s, "off") == 0)  return WifiMode::OFF;
+    if (std::strcmp(s, "auto") == 0) return WifiMode::AUTO;
+    return WifiMode::ON;
+}
+
+static const char* wifiModeToString(WifiMode m) {
+    switch (m) {
+        case WifiMode::OFF:  return "off";
+        case WifiMode::AUTO: return "auto";
+        default:             return "on";
+    }
+}
+
+static void loadWifiMode() {
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, true);
+    const String m = prefs.getString("wifiMode", "auto");
+    prefs.end();
+    wifiMode = wifiModeFromString(m.c_str());
+}
+
+static void saveWifiMode() {
+    Preferences prefs;
+    prefs.begin(kPrefsNamespace, false);
+    prefs.putString("wifiMode", wifiModeToString(wifiMode));
+    prefs.end();
+}
+
+static void startWifiAp() {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1),
+                      IPAddress(255, 255, 255, 0));
+    WiFi.softAP("GrabGeist");
+    // Mittelweg 15 dBm: volle Leistung (~20 dBm) verursachte am USB-Port
+    // Stromspitzen -> Brownout (Servos zucken, AP bricht ab); 8,5 dBm war zu
+    // schwach. 15 dBm reicht fuer einige Meter und haelt die Spitzen klein.
+    WiFi.setTxPower(WIFI_POWER_15dBm);
+    wifiStartMs = millis();
+    wifiLastClientMs = millis();
+    wifiStarted = true;
+    if (!apiStarted) {
+        api.begin();   // HTTP-Server erst starten, wenn WiFi laeuft
+        apiStarted = true;
+    }
+}
+
+static void applyWifiMode() {
+    if (wifiMode == WifiMode::OFF) {
+        if (wifiStarted) {
+            WiFi.mode(WIFI_OFF);
+            wifiStarted = false;
+        }
+    } else {
+        startWifiAp();
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Preset-Koordinaten (am Modell verifiziert).
@@ -60,11 +160,20 @@ static const uint16_t HIDE_PULSE_L = 1580;
 static const uint16_t HIDE_PULSE_R = 1410;
 
 // Software-Bausteine
-static MotionPlanner   planner;
 static ServoController servos;
 static BleUart         ble;
 static Workspace       workspace;
 static ResetLog        resetLog;
+
+// Wegpunkt-Folge (X/Y), abgearbeitet nach Ankunft der Rampe:
+// Tempo = Strombegrenzung * speed%.
+static std::vector<Point> wpPath;
+static size_t   wpIndex = 0;
+static bool     wpActive = false;
+
+// Letzte IK-Zielposition (Startpunkt fuer den naechsten A*-Pfad).
+static float currentX = 0.0f;
+static float currentY = 170.0f;
 
 // Zuletzt an die Servo-Pins ausgegebene PWM-Pulsbreiten (fuer die Monitor-Ausgabe).
 static uint16_t lastPulseL = 0;
@@ -75,6 +184,12 @@ static bool     directMode = false;   // true = Servos direkt ansteuern (RAW), I
 // Servo-Soll (Ziel) und tatsaechlich ausgegebene Pulsbreite (durch die Rampe begrenzt).
 static uint16_t desiredPulseL = 0, desiredPulseR = 0;
 static uint16_t outputPulseL = 0, outputPulseR = 0;
+
+// Zuletzt gueltige Kurbelwinkel (Hysterese-Hint fuer die bimodale IK).
+// Wird in setTargetPulses() mit der tatsaechlichen Servo-Konfiguration synchron
+// gehalten, damit die naechste IK den richtigen Ast waehlt.
+static float lastThetaL = 0.0f;
+static float lastThetaR = 0.0f;
 
 // ---------------------------------------------------------------------------
 // Auto-Ablauf: links -> oben -> rechts -> versteckt -> links -> ...
@@ -123,22 +238,16 @@ static size_t   playbackIndex = 0;
 static uint32_t lastPlaybackMs = 0;
 
 // ---------------------------------------------------------------------------
-// Script: Text-Ablauf (eine Zeile = ein Befehl), vom PC hochgeladen, als Schleife abspielbar.
+// JSON-Ablauf (Sequence) - Zustand.
 // ---------------------------------------------------------------------------
-static const size_t SCRIPT_MAX_LINES = 200;
+enum class SeqWait { NONE, DELAY, ARRIVAL };
 
-static std::vector<std::string> scriptLines;
-static bool   scriptLoading = false;
-static bool   scriptActive = false;
-static size_t scriptIndex = 0;
-
-enum class ScriptWait { NONE, DELAY, ARRIVAL };
-static ScriptWait scriptWait = ScriptWait::NONE;
-static uint32_t   scriptWaitStart = 0;
-static uint32_t   scriptWaitMs = 0;
-
-static const uint32_t SCRIPT_LOAD_TIMEOUT_MS = 5000;
-static uint32_t scriptLoadingStart = 0;
+static Sequence currentSequence;
+static bool     seqActive = false;
+static size_t   seqIndex = 0;
+static SeqWait  seqWait = SeqWait::NONE;
+static uint32_t seqWaitStart = 0;
+static uint32_t seqWaitMs = 0;
 
 // ---------------------------------------------------------------------------
 void servoWriteUs(uint8_t pin, uint16_t pulseUs) {
@@ -158,6 +267,11 @@ void setTargetPulses(uint16_t pulseL, uint16_t pulseR) {
     lastPulseL = pulseL;
     lastPulseR = pulseR;
     lastIkValid = true;
+    // Hysterese-Hint auf die tatsaechliche Servo-Konfiguration setzen. Sonst
+    // waehlt die IK beim ersten MOVE nach dem Boot (Hint 0/0) den Over-Center-Ast
+    // und der linke Servo ueberdreht ueber die Senkrechte hinaus.
+    lastThetaL = servos.pulseToAngleUsLeft((float)pulseL);
+    lastThetaR = servos.pulseToAngleUsRight((float)pulseR);
 }
 
 // Sofort auf eine Position setzen (ohne Rampe) - fuer Start/Homing.
@@ -172,25 +286,24 @@ void setServoInstant(uint16_t pulseL, uint16_t pulseR) {
 
 // ---------------------------------------------------------------------------
 // Servo-Ausgabe mit Rate-Limit: bewegt die tatsaechlich ausgegebenen Pulsbreiten
-// pro Zeitschritt maximal um servoRampUsPerS * dt in Richtung Ziel. Das begrenzt
-// die Servo-Geschwindigkeit/Beschleunigung und damit die Stromspitzen.
+// pro Zeitschritt maximal um (Strombegrenzung * speed%) * dt in Richtung Ziel.
+// Die Strombegrenzung ist der Sicherheits-Deckel; speed% skaliert darunter.
 // ---------------------------------------------------------------------------
 void updateServoRamp(float dt) {
-    if (servoRampUsPerS <= 0.0f) {
-        // Keine Begrenzung -> direkt ans Ziel springen.
-        outputPulseL = desiredPulseL;
-        outputPulseR = desiredPulseR;
-    } else {
-        const float maxStep = servoRampUsPerS * dt;
-        const float dl = (float)desiredPulseL - (float)outputPulseL;
-        const float dr = (float)desiredPulseR - (float)outputPulseR;
-        if (dl > maxStep)       outputPulseL = (uint16_t)((float)outputPulseL + maxStep);
-        else if (dl < -maxStep) outputPulseL = (uint16_t)((float)outputPulseL - maxStep);
-        else                    outputPulseL = desiredPulseL;
-        if (dr > maxStep)       outputPulseR = (uint16_t)((float)outputPulseR + maxStep);
-        else if (dr < -maxStep) outputPulseR = (uint16_t)((float)outputPulseR - maxStep);
-        else                    outputPulseR = desiredPulseR;
+    const float rate = ServoSpeed::rateForPercent(maxRateUsPerSec, servoSpeedPercent);
+    if (rate <= 0.0f) {
+        return;   // Geschwindigkeit 0 % -> halten
     }
+
+    const float maxStep = rate * dt;
+    const float dl = (float)desiredPulseL - (float)outputPulseL;
+    const float dr = (float)desiredPulseR - (float)outputPulseR;
+    if (dl > maxStep)       outputPulseL = (uint16_t)((float)outputPulseL + maxStep);
+    else if (dl < -maxStep) outputPulseL = (uint16_t)((float)outputPulseL - maxStep);
+    else                    outputPulseL = desiredPulseL;
+    if (dr > maxStep)       outputPulseR = (uint16_t)((float)outputPulseR + maxStep);
+    else if (dr < -maxStep) outputPulseR = (uint16_t)((float)outputPulseR - maxStep);
+    else                    outputPulseR = desiredPulseR;
 
     servoWriteUs(PIN_SERVO_LEFT,  outputPulseL);
     servoWriteUs(PIN_SERVO_RIGHT, outputPulseR);
@@ -264,10 +377,6 @@ void sendPositionUpdate() {
     ble.sendLine(buf);
 }
 
-// Zuletzt gueltige Kurbelwinkel (Hysterese-Hint fuer die bimodale IK).
-static float lastThetaL = 0.0f;
-static float lastThetaR = 0.0f;
-
 void moveToPosition(float x, float y) {
     float thetaL = 0.0f, thetaR = 0.0f;
     // Hysterese: die naechste gueltige Konfiguration zu den aktuellen Winkeln waehlen.
@@ -286,6 +395,8 @@ void moveToPosition(float x, float y) {
 // ---------------------------------------------------------------------------
 void setServoDirect(uint16_t pulseL, uint16_t pulseR) {
     directMode = true;
+    wpActive = false;
+    seqActive = false;
     setTargetPulses(pulseL, pulseR);
 }
 
@@ -328,7 +439,8 @@ void startAutoMode() {
     autoActive = true;
     randomActive = false;
     playbackActive = false;
-    scriptActive = false;
+    wpActive = false;
+    seqActive = false;
     autoStep = 0;
     if (!autoTargetPulses(autoStep, autoTargetL, autoTargetR)) {
         autoTargetL = HIDE_PULSE_L;
@@ -400,7 +512,8 @@ void startRandomMode() {
     randomActive = true;
     autoActive = false;
     playbackActive = false;
-    scriptActive = false;
+    wpActive = false;
+    seqActive = false;
     directMode = false;
     randomStage = RandomStage::HIDE_MOVE;   // erst verstecken, dann loslegen
     randomStageStart = millis();
@@ -490,7 +603,8 @@ void startPlayback() {
     recActive = false;
     autoActive = false;
     randomActive = false;
-    scriptActive = false;
+    wpActive = false;
+    seqActive = false;
     directMode = false;
 }
 
@@ -534,29 +648,34 @@ void sendMap() {
 // ---------------------------------------------------------------------------
 // Befehle ausfuehren (ohne BLE-Antwort) - von handleLine UND vom Script benutzt.
 // ---------------------------------------------------------------------------
+void startMoveTo(float x, float y, bool snap) {
+    float tx = x, ty = y;
+    workspace.nearestValid(x, y, tx, ty);
+
+    if (snap) {
+        wpPath.clear();
+        wpPath.push_back({tx, ty});
+    } else {
+        float sx = currentX, sy = currentY;
+        workspace.nearestValid(sx, sy, sx, sy);
+        if (!workspace.findPath(sx, sy, tx, ty, wpPath)) {
+            wpPath.clear();
+            wpPath.push_back({tx, ty});
+        }
+    }
+    wpIndex = 0;
+    wpActive = true;
+
+    currentX = tx;
+    currentY = ty;
+}
+
 void doMoveCommand(float x, float y, bool snap) {
     autoActive = false;
     randomActive = false;
     playbackActive = false;
     directMode = false;
-
-    // Ziel auf den naechsten gueltigen Punkt snappen
-    float tx = x, ty = y;
-    workspace.nearestValid(x, y, tx, ty);
-
-    if (snap) {
-        planner.moveTo(tx, ty, MotionPlanner::MoveType::SNAP);
-    } else {
-        // Pfad vom aktuellen Punkt (ggf. gesnappt) zum Ziel (A* um die Sperrzone)
-        float sx = planner.x(), sy = planner.y();
-        workspace.nearestValid(sx, sy, sx, sy);
-        std::vector<Point> path;
-        if (workspace.findPath(sx, sy, tx, ty, path)) {
-            planner.moveAlongPath(path, MotionPlanner::MoveType::SMOOTH);
-        } else {
-            planner.moveTo(tx, ty, MotionPlanner::MoveType::SMOOTH);
-        }
-    }
+    startMoveTo(x, y, snap);
 }
 
 void doPeekCommand(Command::Peek peek) {
@@ -566,10 +685,10 @@ void doPeekCommand(Command::Peek peek) {
     directMode = false;
     switch (peek) {
         case Command::Peek::LEFT:
-            planner.moveTo(POS_LEFT_X, POS_LEFT_Y, MotionPlanner::MoveType::SMOOTH);
+            startMoveTo(POS_LEFT_X, POS_LEFT_Y, false);
             break;
         case Command::Peek::RIGHT:
-            planner.moveTo(POS_RIGHT_X, POS_RIGHT_Y, MotionPlanner::MoveType::SMOOTH);
+            startMoveTo(POS_RIGHT_X, POS_RIGHT_Y, false);
             break;
         case Command::Peek::TOP:
             // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
@@ -590,82 +709,231 @@ void doRawCommand(uint16_t pulseL, uint16_t pulseR) {
 }
 
 // ---------------------------------------------------------------------------
-// Script (nicht-blockierend): Zeile fuer Zeile ausfuehren, als Schleife.
+// JSON-Ablauf (Sequence): gespeicherten Ablauf als Schleife abspielen.
 // ---------------------------------------------------------------------------
-void startScript() {
-    scriptActive = true;
-    scriptIndex = 0;
-    scriptWait = ScriptWait::NONE;
+static const char* kSequencePath = "/sequence.json";
+
+static void saveSequence() {
+    File f = LittleFS.open(kSequencePath, "w");
+    if (!f) return;
+    const std::string json = Sequence::toJson(currentSequence);
+    f.print(json.c_str());
+    f.close();
+}
+
+static void loadSequence() {
+    if (!LittleFS.exists(kSequencePath)) return;
+    File f = LittleFS.open(kSequencePath, "r");
+    if (!f) return;
+    const String s = f.readString();
+    f.close();
+    Sequence::fromJson(s.c_str(), currentSequence);
+}
+
+static void startSequence() {
+    if (currentSequence.steps.empty()) return;
+    seqActive = true;
+    seqIndex = 0;
+    seqWait = SeqWait::NONE;
     autoActive = false;
     randomActive = false;
     playbackActive = false;
     recActive = false;
+    wpActive = false;
     directMode = false;
 }
 
-void updateScript() {
-    if (!scriptActive) {
-        return;
-    }
+static void updateSequence() {
+    if (!seqActive) return;
     const uint32_t now = millis();
 
-    if (scriptWait == ScriptWait::DELAY) {
-        if (now - scriptWaitStart < scriptWaitMs) {
-            return;
-        }
-        scriptWait = ScriptWait::NONE;
-    } else if (scriptWait == ScriptWait::ARRIVAL) {
-        if (outputPulseL != desiredPulseL || outputPulseR != desiredPulseR) {
-            return;
-        }
-        scriptWait = ScriptWait::NONE;
+    if (seqWait == SeqWait::DELAY) {
+        if (now - seqWaitStart < seqWaitMs) return;
+        seqWait = SeqWait::NONE;
+    } else if (seqWait == SeqWait::ARRIVAL) {
+        if (wpActive || outputPulseL != desiredPulseL || outputPulseR != desiredPulseR) return;
+        seqWait = SeqWait::NONE;
     }
 
-    while (scriptIndex < scriptLines.size()) {
-        const std::string& line = scriptLines[scriptIndex++];
-
-        // Kommentare (#) und Leerzeilen ueberspringen.
-        const char* s = line.c_str();
-        while (*s == ' ' || *s == '\t') {
-            ++s;
+    if (seqIndex >= currentSequence.steps.size()) {
+        if (!currentSequence.loop) {
+            seqActive = false;
+            return;
         }
-        if (*s == '\0' || *s == '#') {
-            continue;
-        }
-
-        Command cmd;
-        if (!CommandParser::parse(line.c_str(), cmd)) {
-            continue;   // unbekannte Zeile ignorieren
-        }
-
-        switch (cmd.type) {
-            case Command::Type::DELAY:
-                scriptWaitMs = cmd.delayMs;
-                scriptWaitStart = now;
-                scriptWait = ScriptWait::DELAY;
-                return;
-            case Command::Type::WAIT:
-                scriptWait = ScriptWait::ARRIVAL;
-                return;
-            case Command::Type::MOVE:
-                doMoveCommand(cmd.x, cmd.y, cmd.snap);
-                scriptWait = ScriptWait::ARRIVAL;   // Bewegung abwarten
-                return;
-            case Command::Type::PEEK:
-                doPeekCommand(cmd.peek);
-                scriptWait = ScriptWait::ARRIVAL;
-                return;
-            case Command::Type::RAW:
-                doRawCommand(cmd.rawL, cmd.rawR);
-                scriptWait = ScriptWait::ARRIVAL;
-                return;
-            default:
-                continue;
-        }
+        seqIndex = 0;
     }
 
-    // Ende erreicht -> von vorne (Schleife).
-    scriptIndex = 0;
+    const Sequence::Step& step = currentSequence.steps[seqIndex++];
+    switch (step.type) {
+        case Sequence::StepType::MOVE:
+            servoSpeedPercent = step.move.speed;
+            doMoveCommand(step.move.x, step.move.y, false);
+            seqWait = SeqWait::ARRIVAL;
+            return;
+
+        case Sequence::StepType::PRESET: {
+            servoSpeedPercent = step.preset.speed;
+            Command::Peek p;
+            if (step.preset.name == "left")       p = Command::Peek::LEFT;
+            else if (step.preset.name == "right") p = Command::Peek::RIGHT;
+            else if (step.preset.name == "hide")  p = Command::Peek::HIDE;
+            else return;
+            doPeekCommand(p);
+            seqWait = SeqWait::ARRIVAL;
+            return;
+        }
+
+        case Sequence::StepType::DELAY:
+            seqWaitMs = step.delay.ms;
+            seqWaitStart = now;
+            seqWait = SeqWait::DELAY;
+            return;
+
+        case Sequence::StepType::WAIT:
+            seqWait = SeqWait::ARRIVAL;
+            return;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JSON-API: Endpunkte mit den internen Aktionen verdrahten.
+// ---------------------------------------------------------------------------
+static void setupApiCallbacks() {
+    api.onInfo = []() -> String {
+        DynamicJsonDocument doc(256);
+        doc["name"] = "GrabGeist";
+        doc["version"] = "0.3.0";
+        doc["wifi"] = wifiModeToString(wifiMode);
+        String out;
+        serializeJson(doc, out);
+        return out;
+    };
+
+    api.onStatus = []() -> String {
+        DynamicJsonDocument doc(256);
+        doc["x"] = currentX;
+        doc["y"] = currentY;
+        doc["pulseL"] = lastPulseL;
+        doc["pulseR"] = lastPulseR;
+        doc["ramp"] = maxRateUsPerSec;
+        doc["speed"] = servoSpeedPercent;
+        doc["moving"] = wpActive;
+        doc["seq"] = seqActive;
+        doc["random"] = randomActive;
+        String out;
+        serializeJson(doc, out);
+        return out;
+    };
+
+    api.onMap = []() -> String {
+        DynamicJsonDocument doc(16384);
+        doc["w"] = workspace.width();
+        doc["h"] = workspace.height();
+        doc["xMin"] = workspace.xMin();
+        doc["yMin"] = workspace.yMin();
+        doc["step"] = workspace.step();
+        JsonArray rows = doc.createNestedArray("rows");
+        const std::vector<uint8_t>& grid = workspace.grid();
+        for (int cy = workspace.height() - 1; cy >= 0; --cy) {
+            std::string row;
+            row.reserve(workspace.width());
+            for (int cx = 0; cx < workspace.width(); ++cx) {
+                row += grid[cy * workspace.width() + cx] ? '1' : '0';
+            }
+            rows.add(row);
+        }
+        String out;
+        serializeJson(doc, out);
+        return out;
+    };
+
+    api.onReset = []() -> String {
+        DynamicJsonDocument doc(256);
+        doc["log"] = resetLog.format();
+        String out;
+        serializeJson(doc, out);
+        return out;
+    };
+
+    api.onMove = [](float x, float y, bool snap) -> bool {
+        seqActive = false;
+        doMoveCommand(x, y, snap);
+        return true;
+    };
+
+    api.onPeek = [](const String& target) -> bool {
+        seqActive = false;
+        Command::Peek p;
+        if (target == "left")        p = Command::Peek::LEFT;
+        else if (target == "right")  p = Command::Peek::RIGHT;
+        else if (target == "top")    p = Command::Peek::TOP;
+        else if (target == "hide")   p = Command::Peek::HIDE;
+        else return false;
+        doPeekCommand(p);
+        return true;
+    };
+
+    api.onRamp = [](float rate) -> bool {
+        maxRateUsPerSec = ServoSpeed::clampRate(rate);
+        saveMaxRate();
+        return true;
+    };
+
+    api.onSpeed = [](float percent) -> bool {
+        servoSpeedPercent = ServoSpeed::clampPercent(percent);
+        return true;
+    };
+
+    api.onStop = []() -> bool {
+        autoActive = false;
+        randomActive = false;
+        playbackActive = false;
+        recActive = false;
+        setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+        return true;
+    };
+
+    api.onRandom = [](bool enabled) -> bool {
+        if (enabled) {
+            startRandomMode();
+        } else {
+            randomActive = false;
+            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+        }
+        return true;
+    };
+
+    api.onWifi = [](const String& mode) -> bool {
+        wifiMode = wifiModeFromString(mode.c_str());
+        saveWifiMode();
+        applyWifiMode();
+        return true;
+    };
+
+    api.onSequenceGet = []() -> String {
+        return String(Sequence::toJson(currentSequence).c_str());
+    };
+
+    api.onSequenceSet = [](const String& json) -> bool {
+        Sequence parsed;
+        std::string err;
+        if (!Sequence::fromJson(json.c_str(), parsed, &err)) {
+            return false;
+        }
+        currentSequence = parsed;
+        saveSequence();
+        return true;
+    };
+
+    api.onRun = []() -> bool {
+        if (seqActive) {
+            seqActive = false;
+            setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+        } else {
+            startSequence();
+        }
+        return true;
+    };
 }
 
 void handleLine(const char* line) {
@@ -677,27 +945,6 @@ void handleLine(const char* line) {
         ble.sendLine(resetLog.format().c_str());
     }
 
-    // Script-Upload: zwischen SCRIPT_CLEAR und SCRIPT_END werden Zeilen gesammelt.
-    if (scriptLoading) {
-        if (std::strcmp(line, "SCRIPT_END") == 0) {
-            scriptLoading = false;
-            char buf[48];
-            snprintf(buf, sizeof(buf), "SCRIPT loaded %u", (unsigned)scriptLines.size());
-            ble.sendLine(buf);
-        } else if (scriptLines.size() < SCRIPT_MAX_LINES) {
-            scriptLines.push_back(line);
-        }
-        return;
-    }
-    if (std::strcmp(line, "SCRIPT_CLEAR") == 0) {
-        scriptLines.clear();
-        scriptActive = false;
-        scriptLoading = true;
-        scriptLoadingStart = millis();
-        ble.sendLine("SCRIPT loading");
-        return;
-    }
-
     Command cmd;
     if (!CommandParser::parse(line, cmd)) {
         ble.sendLine("ERR unknown");
@@ -706,14 +953,14 @@ void handleLine(const char* line) {
 
     switch (cmd.type) {
         case Command::Type::MOVE: {
-            scriptActive = false;
+            seqActive = false;
             doMoveCommand(cmd.x, cmd.y, cmd.snap);
             ble.sendLine("OK");
             break;
         }
 
         case Command::Type::PEEK:
-            scriptActive = false;
+            seqActive = false;
             doPeekCommand(cmd.peek);
             ble.sendLine("OK");
             break;
@@ -723,7 +970,7 @@ void handleLine(const char* line) {
             randomActive = false;
             playbackActive = false;
             recActive = false;
-            scriptActive = false;
+            seqActive = false;
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
             ble.sendLine("OK");
             break;
@@ -768,21 +1015,9 @@ void handleLine(const char* line) {
             }
             break;
 
-        case Command::Type::RUN:
-            if (scriptActive) {
-                scriptActive = false;
-                ble.sendLine("RUN off");
-            } else if (scriptLines.empty()) {
-                ble.sendLine("RUN empty");
-            } else {
-                startScript();
-                ble.sendLine("RUN on");
-            }
-            break;
-
         case Command::Type::RAW:
             // Direkter Servo-Test: IK/Planner umgehen, Pulsbreiten direkt setzen.
-            scriptActive = false;
+            seqActive = false;
             doRawCommand(cmd.rawL, cmd.rawR);
             ble.sendLine("OK");
             break;
@@ -793,8 +1028,8 @@ void handleLine(const char* line) {
             }
             char buf[80];
             snprintf(buf, sizeof(buf), "POS %.1f %.1f %s %u %u",
-                     planner.x(), planner.y(),
-                     planner.isMoving() ? "moving" : "idle",
+                     currentX, currentY,
+                     wpActive ? "moving" : "idle",
                      (unsigned)lastPulseL, (unsigned)lastPulseR);
             ble.sendLine(buf);
             break;
@@ -810,19 +1045,36 @@ void handleLine(const char* line) {
 
         case Command::Type::RAMP: {
             if (cmd.ramp >= 0.0f) {
-                servoRampUsPerS = cmd.ramp;
+                maxRateUsPerSec = ServoSpeed::clampRate(cmd.ramp);
+                saveMaxRate();   // dauerhaft speichern
             }
             char buf[48];
-            snprintf(buf, sizeof(buf), "RAMP %.0f", (double)servoRampUsPerS);
+            snprintf(buf, sizeof(buf), "RAMP %.0f", (double)maxRateUsPerSec);
             ble.sendLine(buf);
             break;
         }
 
-        case Command::Type::DELAY:
-        case Command::Type::WAIT:
-            // Nur innerhalb eines Scripts sinnvoll; einzeln gesendet ignorieren wir sie.
-            ble.sendLine("OK");
+        case Command::Type::SPEED: {
+            if (cmd.speed >= 0.0f) {
+                servoSpeedPercent = ServoSpeed::clampPercent(cmd.speed);
+            }
+            char buf[48];
+            snprintf(buf, sizeof(buf), "SPEED %.0f", (double)servoSpeedPercent);
+            ble.sendLine(buf);
             break;
+        }
+
+        case Command::Type::WIFI: {
+            if (!cmd.wifiMode.empty()) {
+                wifiMode = wifiModeFromString(cmd.wifiMode.c_str());
+                saveWifiMode();
+                applyWifiMode();
+            }
+            char buf[48];
+            snprintf(buf, sizeof(buf), "WIFI %s", wifiModeToString(wifiMode));
+            ble.sendLine(buf);
+            break;
+        }
 
         default:
             break;
@@ -832,10 +1084,21 @@ void handleLine(const char* line) {
 // ---------------------------------------------------------------------------
 void setup() {
     resetLog.recordBoot();   // Reset-Grund persistent in NVS aufzeichnen (als Erstes)
+    loadMaxRate();           // Strombegrenzung aus NVS laden
+    loadWifiMode();          // WiFi-Modus aus NVS laden
 
     Serial.begin(115200);
     Serial.printf("Reset-Grund: %s (boot=%u)\n",
                   resetLog.lastReasonText().c_str(), resetLog.bootCount());
+
+    // Web-UI-Dateisystem mounten (ggf. beim ersten Mal formatieren).
+    if (!LittleFS.begin(true)) {
+        Serial.println("LittleFS mount fehlgeschlagen");
+    }
+    loadSequence();
+
+    setupApiCallbacks();
+    applyWifiMode();         // startet ggf. WiFi-AP + HTTP-Server
 
     // Servo-Kalibrierung (am Modell verifiziert):
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
@@ -851,13 +1114,15 @@ void setup() {
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
     Serial.printf("LEDC attach: L=%d R=%d\n", ledcL, ledcR);
 
+    // Sofort eine gueltige Pulsbreite ausgeben: LEDC startet mit Duty 0 (= 0 us
+    // Pulsbreite, unter dem Servo-Minimum von 500 us). Waehrend der folgenden
+    // workspace.generate() wuerden die Servos sonst an den mechanischen Anschlag
+    // fahren (linker Servo "nach innen" -> verklemmt).
+    setServoInstant(HIDE_PULSE_L, HIDE_PULSE_R);
+
     // Arbeitsraum-Karte berechnen (fuer Tap-to-Move und Pfadplanung)
     workspace.generate();
     Serial.printf("Workspace: %d x %d\n", workspace.width(), workspace.height());
-
-    // Startposition: versteckt (direkte Servo-Position)
-    planner.setPosition(0.0f, 170.0f);   // Planner-Referenz fuer nachfolgende IK-Bewegungen
-    setServoInstant(HIDE_PULSE_L, HIDE_PULSE_R);
 
     // BLE starten
     ble.setLineCallback(handleLine);
@@ -867,6 +1132,10 @@ void setup() {
 }
 
 void loop() {
+    if (apiStarted) {
+        api.handle();   // HTTP-Requests bedienen (jede Iteration)
+    }
+
     // 50-Hz-Schleife (nicht-blockierend)
     static uint32_t prev = millis();
     const uint32_t now = millis();
@@ -883,28 +1152,38 @@ void loop() {
     } else if (playbackActive) {
         updatePlayback();
     } else {
-        if (scriptActive) {
-            updateScript();
+        if (seqActive) {
+            updateSequence();
         }
-        planner.update(dt);
-        if (!directMode) {
-            moveToPosition(planner.x(), planner.y());
+        if (wpActive && !directMode) {
+            moveToPosition(wpPath[wpIndex].x, wpPath[wpIndex].y);
         }
     }
 
     // Aufnahme (passiv): aktuelles Servo-Ziel in festem Takt abtasten.
     updateRecording();
 
-    // Script-Upload nicht ewig im Lade-Modus haengen lassen.
-    if (scriptLoading && (millis() - scriptLoadingStart > SCRIPT_LOAD_TIMEOUT_MS)) {
-        scriptLoading = false;
-        if (!mapSending) {
-            ble.sendLine("SCRIPT timeout");
+    // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
+    updateServoRamp(dt);
+
+    // WiFi-Auto-Modus: erst abschalten, wenn laenger kein Client verbunden ist
+    // (waehrend aktiver Nutzung der Web-UI bleibt der AP an).
+    if (wifiMode == WifiMode::AUTO && WiFi.getMode() == WIFI_AP) {
+        if (WiFi.softAPgetStationNum() > 0) {
+            wifiLastClientMs = millis();
+        } else if (millis() - wifiLastClientMs > WIFI_AUTO_TIMEOUT_MS) {
+            WiFi.mode(WIFI_OFF);
         }
     }
 
-    // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
-    updateServoRamp(dt);
+    // Wegpunkt-Fortschritt: erst wenn die Rampe den aktuellen Punkt erreicht hat.
+    if (wpActive && outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
+        if (wpIndex + 1 < wpPath.size()) {
+            ++wpIndex;
+        } else {
+            wpActive = false;
+        }
+    }
 
     // Karten-Chunks senden (nicht-blockierend).
     updateMapSend();
@@ -912,13 +1191,15 @@ void loop() {
     // Nach abgeschlossenem Positionswechsel die neue Servo-Position melden.
     static uint16_t prevPulseL = 0, prevPulseR = 0;
     static bool     settled = false;
-    if (lastPulseL != prevPulseL || lastPulseR != prevPulseR) {
-        prevPulseL = lastPulseL;
-        prevPulseR = lastPulseR;
-        settled = false;
-    } else if (!settled) {
-        settled = true;
-        sendPositionUpdate();
+    if (!wpActive) {
+        if (lastPulseL != prevPulseL || lastPulseR != prevPulseR) {
+            prevPulseL = lastPulseL;
+            prevPulseR = lastPulseR;
+            settled = false;
+        } else if (!settled) {
+            settled = true;
+            sendPositionUpdate();
+        }
     }
 
     // Monitor-Ausgabe: 1x pro Sekunde die tatsaechlich an die Pins ausgegebenen
@@ -932,10 +1213,10 @@ void loop() {
             snprintf(buf, sizeof(buf), "PWM L=%uus R=%uus  readL=%u readR=%u  pos=(%.1f, %.1f)",
                      (unsigned)lastPulseL, (unsigned)lastPulseR,
                      (unsigned)ledcRead(PIN_SERVO_LEFT), (unsigned)ledcRead(PIN_SERVO_RIGHT),
-                     planner.x(), planner.y());
+                     currentX, currentY);
         } else {
             snprintf(buf, sizeof(buf), "IK ungueltig  pos=(%.1f, %.1f)",
-                     planner.x(), planner.y());
+                     currentX, currentY);
         }
         Serial.println(buf);
     }

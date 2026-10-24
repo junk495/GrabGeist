@@ -24,13 +24,16 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 
 ## Verzeichnisstruktur
 - `src/main.cpp` — Arduino-Sketch (Einstieg, `setup()`/`loop()`, 50-Hz-Loop)
-- `src/BleUart.{h,cpp}` — BLE-UART (Nordic-UART-Service) für die Handy-Teststeuerung (ESP32-spezifisch)
+- `src/BleUart.{h,cpp}` — BLE-UART (Nordic-UART-Service) als Testkanal (ESP32-spezifisch)
 - `src/ResetLog.{h,cpp}` — persistente Reset-Diagnose (NVS) (ESP32-spezifisch)
+- `src/ApiServer.{h,cpp}` — WiFi-Webserver + JSON-API (REST) (ESP32-spezifisch)
+- `data/index.html` — Web-UI (PWA) als Ablauf-Editor
 - `lib/Kinematics/` — inverse Kinematik (pur, hardwarefrei)
 - `lib/ServoController/` — Kurbelwinkel → PWM-Pulsbreite
-- `lib/MotionPlanner/` — nicht-blockierende Bahnplanung (Sprung/Sweep)
+- `lib/ServoSpeed/` — Servo-Rampe/Strombegrenzung (µs/s)
 - `lib/CommandParser/` — Textbefehle → strukturierter `Command`
 - `lib/Workspace/` — erreichbarer Arbeitsraum (Nierenform: Karte, Snap, A*-Pfad)
+- `lib/Sequence/` — JSON-Ablauf (Move/Preset/Delay/Wait) mit Persistenz
 - `lib/Point/` — gemeinsamer 2D-Punkt-Typ (`struct Point`, Header-only)
 - `test/` — native Unit-Tests (Unity)
 - `tools/test_gui.html` — Handy-Testoberfläche (Web Bluetooth)
@@ -46,6 +49,6 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 
 ## Konventionen
 - Winkel intern in **Radiant**; Umrechnung auf Grad/PWM erst im `ServoController`.
-- Datenfluss: `BleUart`/Eingabe → `CommandParser` → `Workspace` → `MotionPlanner` → `Kinematics` → `ServoController` → LEDC.
+- Datenfluss: Eingabe (`BleUart`/`ApiServer`) → `CommandParser`/`Sequence` → `Workspace` → `Kinematics` → `ServoController` → LEDC; Bewegung über Wegpunkt-Folge + `ServoSpeed`-Rampe.
 - Wiederverwendbare/testbare Logik in `lib/`; ESP32-spezifischer Code (BLE, LEDC) in `src/`.
 - IK-Solver `calculateIK(x, y, &thetaL, &thetaR)` ist **bimodal** (Knie nach außen + Over-Center) und lehnt ungültige/kollidierende Koordinaten mit `false` ab (siehe Spec §4).

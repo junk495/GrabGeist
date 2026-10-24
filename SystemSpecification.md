@@ -125,22 +125,22 @@ Aus den 7 Prüfungen ergibt sich ein **nierenförmiger** Arbeitsraum: große obe
 3. **Klasse `ServoController`:**
    - Bildet kinematische Winkel $(\theta_L, \theta_R)$ auf PWM-Mikrosekunden (`500`–`2500` µs) ab.
    - Muss Kalibrier-Offsets (`zeroOffsetLeft`, `zeroOffsetRight`) und Richtungs-Invertierungs-Flags (`invertLeft`, `invertRight`) enthalten, um Montagetoleranzen der Servohörner auszugleichen.
-4. **`MotionPlanner` / Interpolation:**
-   - Nicht-blockierende Trajektoriengenerierung.
-   - **Hindernisbewusst:** fährt A*-Wegpunkte des `Workspace` ab (Umweg um die Sperrzone) und reicht die aktuellen Winkel als Hysterese-Hint an die IK durch.
+4. **Bahnsteuerung (Wegpunkt-Folge + Servo-Rampe):**
+   - **Hindernisbewusst:** fährt die A*-Wegpunkte des `Workspace` ab (Umweg um die Sperrzone) und reicht den aktuellen Winkel als Hysterese-Hint an die IK durch.
+   - **`ServoSpeed`-Rampe:** deckelt die maximale PWM-Änderungsrate (µs/s) und begrenzt damit Beschleunigung/Stromspitzen; `SPEED %` skaliert darunter.
    - Zwei Bewegungstypen:
      - **Snap-/Pop-out-Bewegung:** Direkter Sprung zum Ziel $(X, Y)$ mit maximaler physischer Servogeschwindigkeit.
-     - **Lineare/sanfte Bewegung (Sweep/Joystick):** Interpoliert zwischen aktuellem $(X_0, Y_0)$ und Ziel $(X_1, Y_1)$ in kleinen Zeitschritten (z.B. 50Hz/20ms Update-Schleife) mit linearer Interpolation oder S-Kurve/Kosinus-Easing; dabei wird in jedem Zwischenschritt der IK-Löser aufgerufen, sodass sich der Kopf auf einer kontrollierten Bahn bewegt.
+     - **Lineare/sanfte Bewegung (Sweep):** Wegpunkt-Folge mit begrenzter Geschwindigkeit; die Rampe sorgt für eine kontrollierte Bahn.
 5. **Klasse `CommandParser`:** (hardwarefrei)
-   - Zerlegt Textbefehle (`MOVE`, `PEEK`, `STOP`, `STATUS`, `RAW`, `AUTO`, `MAP`) in einen strukturierten `Command`.
+   - Zerlegt Textbefehle (`MOVE`, `PEEK`, `STOP`, `STATUS`, `RAW`, `AUTO`, `RANDOM`, `REC`, `PLAY`, `MAP`, `RAMP`, `SPEED`, `WIFI`, `RESETLOG`) in einen strukturierten `Command`.
 6. **Betriebsmodi:**
    - `MANUAL`: Direkte X/Y-Eingabe (Tap-to-Move-Karte / Joystick / BLE).
    - `RECORD_PLAYBACK`: Ringpuffer/Array zur Aufzeichnung von $(X, Y)$-Koordinaten in festen Zeitabständen (z.B. 20Hz) und deren Wiedergabe als Schleife.
    - `RANDOM`: Zustandsmaschine, die zufällig gültige Presets wählt (Versteckt, Links Peek, Rechts Peek, Oben Peek) mit zufälligen Halte- und Versteck-Dauern.
    - `PRESET`: Fest kodierte Trajektorien (Sweep links–rechts, Pop-out und zurück).
-      → Umsetzung: ersetzt durch das **Script-System** (Ablauf als Textdatei hochladen, mit `RUN` abspielen).
+      → Umsetzung: ersetzt durch **JSON-Abläufe** (`Sequence`, über die Web-UI/JSON-API bearbeitet und per `POST /api/run` abgespielt).
 
-> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe und ein Reset-Log (NVS). `PRESET` ist durch Scripts ersetzt.
+> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe (`ServoSpeed`), ein Reset-Log (NVS), ein WiFi-SoftAP mit JSON-API (`ApiServer`) und ein persistent gespeicherter JSON-Ablauf (`Sequence`). `PRESET` ist durch JSON-Abläufe ersetzt.
 
 
 

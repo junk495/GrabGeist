@@ -75,9 +75,9 @@ void test_servo_box_blocked(void) {
     TEST_ASSERT_FALSE(Kinematics::isReachable(0.0f, 10.0f));
 }
 
-// Hysterese: der Hint waehlt die naechste gueltige Konfiguration.
-// (0,170) hat zwei gueltige Loesungen: beide "Knie nach aussen" (123.1/56.9)
-// oder rechter Arm "Over-Center" (123.1/144.7).
+// Hysterese: der Hint waehlt die naechste gueltige symmetrische Konfiguration.
+// (0,170) hat mehrere gueltige Loesungen; gemischte (ein Arm Over-Center) werden
+// vermieden, damit der Geist nicht schief steht.
 void test_hysteresis(void) {
     // Ohne Hint: Knie nach aussen.
     float tl = 0.0f, tr = 0.0f;
@@ -85,14 +85,25 @@ void test_hysteresis(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(123.1f), tl);
     TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(56.9f), tr);
 
-    // Mit Hint nahe der Over-Center-Loesung des rechten Arms wechselt dieser
-    // auf Over-Center, der linke Arm bleibt bei Knie nach aussen.
+    // Auch mit einem Hint nahe einer Over-Center-/Misch-Konfiguration bleibt
+    // die symmetrische Loesung (beide "Knie nach aussen") gewaehlt.
     float tl2 = 0.0f, tr2 = 0.0f;
     TEST_ASSERT_TRUE(Kinematics::calculateIK(0.0f, 170.0f,
                                              Kinematics::degToRad(35.0f),
                                              Kinematics::degToRad(145.0f), tl2, tr2));
     TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(123.1f), tl2);
-    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(144.7f), tr2);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(56.9f), tr2);
+}
+
+// Untere Tasche: auch mit einem "falschen" Hint bleibt die (einzige gueltige)
+// gemischte Over-Center-Loesung erhalten.
+void test_lower_pocket_hysteresis(void) {
+    float tl = 0.0f, tr = 0.0f;
+    TEST_ASSERT_TRUE(Kinematics::calculateIK(-120.0f, -40.0f,
+                                             Kinematics::degToRad(0.0f),
+                                             Kinematics::degToRad(0.0f), tl, tr));
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(288.8f), tl);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(142.3f), tr);
 }
 
 int main(void) {
@@ -106,5 +117,6 @@ int main(void) {
     RUN_TEST(test_lower_pocket_right);
     RUN_TEST(test_servo_box_blocked);
     RUN_TEST(test_hysteresis);
+    RUN_TEST(test_lower_pocket_hysteresis);
     return UNITY_END();
 }
