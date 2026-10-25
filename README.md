@@ -79,7 +79,8 @@ pio test -e test              # Unit-Tests (nativ)
 | `SystemSpecification.md` | autoritative Spezifikation |
 | `kinematik_konzept.md` | IK-Briefing (Formeln, Beispiele) |
 | `steuerung_konzept.md` | Steuerungskonzept (Tasten/BLE/Joystick) |
-| `verkabelung.md` | Verkabelung & Stromversorgung |
+| `verkabelung.md` | Verkabelung & Stromversorgung (Probeaufbau/Ist-Zustand) |
+| `pcb/` | PCB-Design (Planung, startet mit der Stromversorgung) |
 
 ## Roadmap
 
