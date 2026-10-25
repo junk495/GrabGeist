@@ -764,6 +764,15 @@ void handleLine(const char* line) {
         ble.sendLine("SEQ stop");
         return;
     }
+    if (std::strcmp(line, "SEQ_GET") == 0) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "SEQ_STATE loop=%d autostart=%d steps=%u",
+                 currentSequence.loop ? 1 : 0,
+                 currentSequence.autostart ? 1 : 0,
+                 (unsigned)currentSequence.steps.size());
+        ble.sendLine(buf);
+        return;
+    }
 
     Command cmd;
     if (!CommandParser::parse(line, cmd)) {
