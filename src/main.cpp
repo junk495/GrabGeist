@@ -733,10 +733,19 @@ static std::vector<std::string> listNamedSequences() {
 static void sendSequenceList() {
     const std::vector<std::string> names = listNamedSequences();
     Serial.printf("SEQ_LIST: %u Ablaeufe\n", (unsigned)names.size());
+
+    // Als EINE JSON-Zeile senden -> keine Reihenfolge-/Verlust-Probleme
+    // zwischen mehreren Einzelzeilen (SEQ_NAME ... / SEQ_LIST_DONE).
+    DynamicJsonDocument doc(2048);
+    JsonArray arr = doc.to<JsonArray>();
     for (const auto& n : names) {
-        ble.sendLine(("SEQ_NAME " + n).c_str());
+        arr.add(n);
     }
-    ble.sendLine("SEQ_LIST_DONE");
+    std::string json;
+    serializeJson(doc, json);
+    const std::string payload = "SEQ_LISTJSON " + json;
+    ble.sendChunked(payload.data(), payload.size());
+    ble.sendLine("");
 }
 
 static void startSequence() {
