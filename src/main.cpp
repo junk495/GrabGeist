@@ -692,6 +692,7 @@ static void updateSequence() {
     if (seqIndex >= currentSequence.steps.size()) {
         if (!currentSequence.loop) {
             seqActive = false;
+            servoSpeedPercent = 100.0f;   // Schritt-Geschwindigkeit nicht "kleben" lassen
             return;
         }
         seqIndex = 0;
@@ -747,6 +748,7 @@ void handleLine(const char* line) {
     if (std::strcmp(line, "SEQ_RUN") == 0) {
         if (seqActive) {
             seqActive = false;
+            servoSpeedPercent = 100.0f;   // Schritt-Geschwindigkeit nicht "kleben" lassen
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
             ble.sendLine("SEQ off");
         } else {
@@ -757,6 +759,7 @@ void handleLine(const char* line) {
     }
     if (std::strcmp(line, "SEQ_STOP") == 0) {
         seqActive = false;
+        servoSpeedPercent = 100.0f;   // Geschwindigkeit zuruecksetzen
         setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
         ble.sendLine("SEQ stop");
         return;
@@ -788,6 +791,7 @@ void handleLine(const char* line) {
             playbackActive = false;
             recActive = false;
             seqActive = false;
+            servoSpeedPercent = 100.0f;   // Geschwindigkeit zuruecksetzen
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
             ble.sendLine("OK");
             break;
