@@ -9,6 +9,7 @@
 #include <NimBLEUtils.h>
 #include <NimBLEConnInfo.h>
 
+#include <mutex>
 #include <string>
 
 class BleUart : public NimBLECharacteristicCallbacks {
@@ -25,6 +26,10 @@ public:
     // Großen Textblock in MTU-gerechten Chunks senden (fuer die Arbeitsraum-Karte).
     void sendChunked(const char* data, size_t len);
 
+    // Nicht-blockierend: einen TX-Chunk senden. Aus loop() aufrufen (serialisiert
+    // alle Sender und ersetzt das bisherige delay()-Pacing).
+    void tick();
+
     // NimBLECharacteristicCallbacks
     void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo& connInfo) override;
 
@@ -32,5 +37,7 @@ private:
     NimBLECharacteristic* rxCharacteristic_ = nullptr;   // Handy -> ESP
     NimBLECharacteristic* txCharacteristic_ = nullptr;   // ESP -> Handy (notify)
     LineCallback lineCallback_ = nullptr;
-    std::string buffer_;
+    std::string buffer_;        // RX-Puffer (empfangene Zeilen)
+    std::string txQueue_;       // TX-Warteschlange (ausstehende Bytes)
+    std::mutex  txMutex_;       // schuetzt txQueue_
 };

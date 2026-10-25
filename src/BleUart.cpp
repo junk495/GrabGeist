@@ -68,33 +68,37 @@ void BleUart::sendLine(const char* line) {
     if (txCharacteristic_ == nullptr || line == nullptr) {
         return;
     }
-    std::string payload = std::string(line) + "\n";
-    // notify(value, len) uebergibt die Daten direkt (mbuf), statt sie erst in
-    // den Characteristic-Puffer zu schreiben -> keine Ueberschreib-Race.
-    txCharacteristic_->notify((const uint8_t*)payload.data(), payload.size());
-
-    // Kurze Pause zwischen Notifications. Ohne Pause verliert/verschmilzt Web
-    // Bluetooth (Browser) bei schnellem Versand vieler Zeilen (z.B. der
-    // Arbeitsraum-Karte) einzelne Notifications -> Karte bleibt unvollstaendig.
-    delay(15);
+    std::lock_guard<std::mutex> lock(txMutex_);
+    txQueue_ += line;
+    txQueue_ += '\n';
 }
 
 void BleUart::sendChunked(const char* data, size_t len) {
-    if (txCharacteristic_ == nullptr || data == nullptr) {
+    if (txCharacteristic_ == nullptr || data == nullptr || len == 0) {
         return;
     }
-    // 180 Byte pro Notification: sicher unter der MTU (247 -> max. 244), aber
-    // auch noch unter 185-3=182, falls der Browser eine kleinere MTU aushandelt.
-    const size_t CHUNK = 180;
-    size_t off = 0;
-    while (off < len) {
-        const size_t n = (len - off) < CHUNK ? (len - off) : CHUNK;
-        txCharacteristic_->notify((const uint8_t*)(data + off), n);
-        off += n;
-        if (off < len) {
-            delay(20);   // Pacen gegen Web-Bluetooth-Notification-Verlust
-        }
+    std::lock_guard<std::mutex> lock(txMutex_);
+    txQueue_.append(data, len);
+}
+
+void BleUart::tick() {
+    if (txCharacteristic_ == nullptr) {
+        return;
     }
+    // Naechsten Chunk (max. 180 Byte, sicher unter der MTU 247) unter Lock
+    // entnehmen und DANN ohne Lock senden -> kein Deadlock mit dem NimBLE-Lock.
+    std::string chunk;
+    {
+        std::lock_guard<std::mutex> lock(txMutex_);
+        if (txQueue_.empty()) {
+            return;
+        }
+        const size_t CHUNK = 180;
+        const size_t n = txQueue_.size() < CHUNK ? txQueue_.size() : CHUNK;
+        chunk.assign(txQueue_.data(), n);
+        txQueue_.erase(0, n);
+    }
+    txCharacteristic_->notify((const uint8_t*)chunk.data(), chunk.size());
 }
 
 void BleUart::onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo& connInfo) {

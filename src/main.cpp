@@ -1123,6 +1123,9 @@ void loop() {
     // Karten-Chunks senden (nicht-blockierend).
     updateMapSend();
 
+    // BLE-TX-Warteschlange abarbeiten (ein Chunk pro Loop-Durchlauf, ~20 ms).
+    ble.tick();
+
     // Nach abgeschlossenem Positionswechsel die neue Servo-Position melden.
     static uint16_t prevPulseL = 0, prevPulseR = 0;
     static bool     settled = false;
