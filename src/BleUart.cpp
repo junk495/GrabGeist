@@ -69,8 +69,9 @@ void BleUart::sendLine(const char* line) {
         return;
     }
     std::string payload = std::string(line) + "\n";
-    txCharacteristic_->setValue(payload);
-    txCharacteristic_->notify();
+    // notify(value, len) uebergibt die Daten direkt (mbuf), statt sie erst in
+    // den Characteristic-Puffer zu schreiben -> keine Ueberschreib-Race.
+    txCharacteristic_->notify((const uint8_t*)payload.data(), payload.size());
 
     // Kurze Pause zwischen Notifications. Ohne Pause verliert/verschmilzt Web
     // Bluetooth (Browser) bei schnellem Versand vieler Zeilen (z.B. der
@@ -88,8 +89,7 @@ void BleUart::sendChunked(const char* data, size_t len) {
     size_t off = 0;
     while (off < len) {
         const size_t n = (len - off) < CHUNK ? (len - off) : CHUNK;
-        txCharacteristic_->setValue((const uint8_t*)(data + off), n);
-        txCharacteristic_->notify();
+        txCharacteristic_->notify((const uint8_t*)(data + off), n);
         off += n;
         if (off < len) {
             delay(20);   // Pacen gegen Web-Bluetooth-Notification-Verlust
