@@ -67,7 +67,7 @@ SPEED [<%>]                # Geschwindigkeit setzen/abfragen (skaliert unter der
 RESETLOG                   # Grund des letzten Resets ausgeben
 MAP                        # Arbeitsraum-Karte anfordern
 
-# Abläufe (Sequenzen): kommen über BLE (SEQ_GET/SEQ_SET/SEQ_RUN, in Arbeit).
+# Abläufe (Sequenzen): SEQ_SET <json> · SEQ_RUN · SEQ_STOP · SEQ_GET · SEQ_SAVE <name> · SEQ_LIST · SEQ_LOAD <name> · SEQ_DELETE <name>
 ```
 
 **Konsequenz für die Firmware:**
@@ -107,7 +107,7 @@ Hinweise:
 2. **Phase 2:** **BLE-UART** fürs Handy (Moduswahl + Parameter).
 3. **Phase 3 (optional):** analoger **Joystick** (MANUAL/Sweep, RECORD) und/oder Web-UI.
 
-**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`, NimBLE), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `ServoSpeed` (Servo-Rampe/Strombegrenzung), **Reset-Log (NVS)**, **Sequence** (JSON-Ablauf, persistent in `/sequence.json`) sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1).
+**Aktueller Stand:** `CommandParser`, **BLE-UART** (`src/BleUart`, NimBLE, zentrale TX-Warteschlange), `Kinematics` (bimodal + Kollision + Hysterese), `Workspace` (Karte/Snap/A* + Sperrzonen-Abstand), **Tap-to-Move**, `ServoController`, `ServoSpeed` (Servo-Rampe/Strombegrenzung), **Reset-Log (NVS)**, **Sequence** (benannte JSON-Abläufe in `/seq/`, `loop`/`autostart`) sowie die Modi `AUTO`, `RANDOM`, `REC`/`PLAY` sind umgesetzt. Noch offen: `ModeManager`/**Tasten** (Phase 1).
 
 ## 8. Offene Punkte (hängen von der Mechanik ab)
 

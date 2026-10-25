@@ -132,15 +132,15 @@ Aus den 7 Prüfungen ergibt sich ein **nierenförmiger** Arbeitsraum: große obe
      - **Snap-/Pop-out-Bewegung:** Direkter Sprung zum Ziel $(X, Y)$ mit maximaler physischer Servogeschwindigkeit.
      - **Lineare/sanfte Bewegung (Sweep):** Wegpunkt-Folge mit begrenzter Geschwindigkeit; die Rampe sorgt für eine kontrollierte Bahn.
 5. **Klasse `CommandParser`:** (hardwarefrei)
-   - Zerlegt Textbefehle (`MOVE`, `PEEK`, `STOP`, `STATUS`, `RAW`, `AUTO`, `RANDOM`, `REC`, `PLAY`, `MAP`, `RAMP`, `SPEED`, `WIFI`, `RESETLOG`) in einen strukturierten `Command`.
+   - Zerlegt Textbefehle (`MOVE`, `PEEK`, `STOP`, `STATUS`, `RAW`, `AUTO`, `RANDOM`, `REC`, `PLAY`, `MAP`, `RAMP`, `SPEED`, `RESETLOG`) in einen strukturierten `Command`.
 6. **Betriebsmodi:**
    - `MANUAL`: Direkte X/Y-Eingabe (Tap-to-Move-Karte / Joystick / BLE).
    - `RECORD_PLAYBACK`: Ringpuffer/Array zur Aufzeichnung von $(X, Y)$-Koordinaten in festen Zeitabständen (z.B. 20Hz) und deren Wiedergabe als Schleife.
    - `RANDOM`: Zustandsmaschine, die zufällig gültige Presets wählt (Versteckt, Links Peek, Rechts Peek, Oben Peek) mit zufälligen Halte- und Versteck-Dauern.
    - `PRESET`: Fest kodierte Trajektorien (Sweep links–rechts, Pop-out und zurück).
-      → Umsetzung: ersetzt durch **JSON-Abläufe** (`Sequence`, über die Web-UI/JSON-API bearbeitet und per `POST /api/run` abgespielt).
+      → Umsetzung: ersetzt durch **JSON-Abläufe** (`Sequence`, über die PWA/BLE bearbeitet; persistent als benannte Abläufe gespeichert).
 
-> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe (`ServoSpeed`), ein Reset-Log (NVS) und ein persistent gespeicherter JSON-Ablauf (`Sequence`). Bedienung über BLE (Nordic UART Service, NimBLE); die Oberfläche ist die PWA im Repo `GrabGeistApp`. `PRESET` ist durch JSON-Abläufe ersetzt.
+> **Implementierungsstatus:** `MANUAL`, `RECORD_PLAYBACK` (Pulsbreiten statt (X,Y), da „Versteckt"/„Beide oben" direkte Servo-Positionen sind) und `RANDOM` sind umgesetzt. Zusätzlich existieren eine konfigurierbare Servo-Rampe (`ServoSpeed`), ein Reset-Log (NVS) und persistente JSON-Abläufe (`Sequence`: benannte Abläufe mit `loop`/`autostart`, `SEQ_*`-Befehle über BLE). Bedienung über BLE (Nordic UART Service, NimBLE); die Oberfläche ist die PWA im Repo `GrabGeistApp`. `PRESET` ist durch JSON-Abläufe ersetzt.
 
 
 

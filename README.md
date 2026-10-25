@@ -36,11 +36,13 @@ Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) autom
 - **Hysterese** – verhindert Konfigurationssprünge der Servos während der Bewegung
 - **Betriebsmodi** – `AUTO` (fester Ablauf), `RANDOM` (zufälliges Hervorschauen),
   `REC`/`PLAY` (Aufnahme & Wiedergabe)
-- **Ablauf-Editor** – JSON-Sequenzen (Move/Preset/Delay/Wait),
-  persistent in `/sequence.json`
+- **Ablauf-Editor** – JSON-Sequenzen (Move-/Preset-Schritte mit Speed + Haltezeit);
+  mehrere benannte Abläufe persistent auf der ESP (`/seq/<name>.json`), `loop` + `autostart`,
+  Export/Import als JSON
 - **Reset-Diagnose** – Reset-Grund wird persistent in NVS gespeichert und per BLE abrufbar
 - **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `RANDOM`, `RAMP`,
-  `SPEED`, `REC`, `PLAY`, …)
+  `SPEED`, `REC`, `PLAY`, `SEQ_SET`/`SEQ_RUN`/`SEQ_STOP`/`SEQ_GET`/`SEQ_SAVE`/`SEQ_LIST`/
+  `SEQ_LOAD`/`SEQ_DELETE`, …)
 
 ## Tech-Stack
 
@@ -83,12 +85,10 @@ pio test -e test              # Unit-Tests (nativ)
 
 Ideen für die nächsten Schritte (noch nicht umgesetzt):
 
-- **Persistenz + Auto-Start (NVS)** – aktiver Modus überlebt einen Neustart;
-  optional Autostart für den Standalone-Betrieb ohne Handy.
 - **Bewegungsauslöser (PIR-Sensor)** – Geist reagiert auf Näherung.
 - **Physische Taste(n)** – „Verstecken/Stopp" (blind bedienbar) und ggf. Peek-Tasten.
 - **Parameter-Persistenz (NVS)** – Rampe/Zufalls-Dauern speichern.
-- **GUI-Ausbau** – Modus-Anzeige, Live-Position, Rampe-Synchronisation.
+- **GUI-Ausbau** – Modus-Anzeige, Rampe-Synchronisation.
 - **Cleanup** – weiter toten Code entfernen, optional `ModeManager` zur Strukturierung.
 
 ## Lizenz

@@ -31,7 +31,7 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 - `lib/ServoSpeed/` — Servo-Rampe/Strombegrenzung (µs/s)
 - `lib/CommandParser/` — Textbefehle → strukturierter `Command`
 - `lib/Workspace/` — erreichbarer Arbeitsraum (Nierenform: Karte, Snap, A*-Pfad)
-- `lib/Sequence/` — JSON-Ablauf (Move/Preset/Delay/Wait) mit Persistenz
+- `lib/Sequence/` — JSON-Ablauf (Move-/Preset-Schritte mit Speed + Haltezeit; `loop`/`autostart`)
 - `lib/Point/` — gemeinsamer 2D-Punkt-Typ (`struct Point`, Header-only)
 - `test/` — native Unit-Tests (Unity)
 - `tools/test_gui.html` — BLE-Testoberfläche (Referenz; durch die PWA `GrabGeistApp` ersetzt)
@@ -53,5 +53,5 @@ Alle Maße werden als **eine zentrale, leicht anpassbare Konstante** (`constexpr
 
 ## App (getrenntes Repo)
 - Die Bedienoberfläche ist eine **PWA im Repo `GrabGeistApp`** (Web Bluetooth, Nordic UART Service) — nicht in diesem Repo.
-- **BLE-Textprotokoll** (UUIDs + Befehle `MOVE`/`PEEK`/`RAW`/`MAP`/`STATUS`/…) ist der **Vertrag** zwischen App und Firmware; bei Änderung **beide Repos** anpassen.
+- **BLE-Textprotokoll** (UUIDs + Befehle `MOVE`/`PEEK`/`RAW`/`MAP`/`STATUS`/`SEQ_*`/…) ist der **Vertrag** zwischen App und Firmware; bei Änderung **beide Repos** anpassen.
 - WiFi/`ApiServer` und die alte Web-UI sind entfernt; Bedienung nur über die PWA.
