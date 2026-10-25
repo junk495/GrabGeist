@@ -499,8 +499,20 @@ void updateRandomMode() {
 // Programm-Zufallsmodus (nicht-blockierend).
 // ---------------------------------------------------------------------------
 
+// True, wenn (x, y) der "Versteckt"-Stellung entspricht (innerhalb 10 mm von
+// hideX/hideY). Diese Stellung wird im Programm-Zufallsmodus ohnehin
+// automatisch zwischen den Positionen angefahren und deshalb nicht als
+// eigenstaendige Zielposition gezogen.
+static bool isHidePosition(float x, float y) {
+    constexpr float RADIUS_MM = 10.0f;
+    const float dx = x - hideX;
+    const float dy = y - hideY;
+    return (dx * dx + dy * dy) < (RADIUS_MM * RADIUS_MM);
+}
+
 // Positionen des geladenen Ablaufs sammeln (nur die Koordinaten, ohne
-// Speed/Haltezeit). Nur IK-erreichbare Positionen werden uebernommen.
+// Speed/Haltezeit). Nur IK-erreichbare Positionen werden uebernommen;
+// die "Versteckt"-Stellung wird ausgeschlossen.
 static void collectProgramPositions() {
     progRandPositions.clear();
     for (const Sequence::Step& step : currentSequence.steps) {
@@ -519,18 +531,23 @@ static void collectProgramPositions() {
                 x = POS_RIGHT_X; y = POS_RIGHT_Y; have = true;
             } else if (step.preset.name == "rightplus") {
                 x = POS_RIGHT_PLUS_X; y = POS_RIGHT_PLUS_Y; have = true;
-            } else if (step.preset.name == "hide") {
-                x = hideX; y = hideY; have = true;
             }
-            // "top" ist eine direkte Servo-Stellung und wird uebersprungen.
+            // "hide" und "top" werden uebersprungen: "hide" ist die automatische
+            // Zwischenstellung, "top" eine direkte Servo-Stellung.
         }
-        if (have && Kinematics::isReachable(x, y)) {
+        if (have && !isHidePosition(x, y) && Kinematics::isReachable(x, y)) {
             progRandPositions.push_back({x, y});
         }
     }
 }
 
-void startProgRandomMode() {
+// Liefert false, wenn der Ablauf keine anfahrbaren Positionen enthaelt
+// (z. B. nur "Versteckt").
+bool startProgRandomMode() {
+    collectProgramPositions();
+    if (progRandPositions.empty()) {
+        return false;
+    }
     progRandomActive = true;
     autoActive = false;
     randomActive = false;
@@ -538,10 +555,10 @@ void startProgRandomMode() {
     seqActive = false;
     directMode = false;
     servoSpeedPercent = 100.0f;   // Geschwindigkeit immer 100 %
-    collectProgramPositions();
     setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);   // erst verstecken
     progRandStage = ProgRandStage::HIDE_MOVE;
     progRandStageStart = millis();
+    return true;
 }
 
 void updateProgRandomMode() {
@@ -1002,11 +1019,10 @@ void handleLine(const char* line) {
                 servoSpeedPercent = 100.0f;
                 setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
                 ble.sendLine("PROGRANDOM off");
-            } else if (currentSequence.steps.empty()) {
-                ble.sendLine("PROGRANDOM empty");
-            } else {
-                startProgRandomMode();
+            } else if (startProgRandomMode()) {
                 ble.sendLine("PROGRANDOM on");
+            } else {
+                ble.sendLine("PROGRANDOM empty");
             }
             break;
 
