@@ -732,6 +732,7 @@ static std::vector<std::string> listNamedSequences() {
 
 static void sendSequenceList() {
     const std::vector<std::string> names = listNamedSequences();
+    Serial.printf("SEQ_LIST: %u Ablaeufe\n", (unsigned)names.size());
     for (const auto& n : names) {
         ble.sendLine(("SEQ_NAME " + n).c_str());
     }
