@@ -92,7 +92,7 @@ void BleUart::sendChunked(const char* data, size_t len) {
         txCharacteristic_->notify();
         off += n;
         if (off < len) {
-            delay(10);   // Pacen gegen Web-Bluetooth-Notification-Verlust
+            delay(20);   // Pacen gegen Web-Bluetooth-Notification-Verlust
         }
     }
 }

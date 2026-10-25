@@ -884,9 +884,11 @@ void handleLine(const char* line) {
         const char* name = line + 9;
         if (loadNamedSequence(name)) {
             const std::string json = Sequence::toJsonCompact(currentSequence);
+            Serial.printf("SEQ_LOAD ok '%s' (%u bytes)\n", name, (unsigned)json.size());
             const std::string payload = "SEQ_JSON " + json + "\n";
             ble.sendChunked(payload.data(), payload.size());
         } else {
+            Serial.printf("SEQ_LOAD notfound '%s'\n", name);
             ble.sendLine("SEQ_ERR notfound");
         }
         return;
