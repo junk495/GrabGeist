@@ -101,6 +101,7 @@ bool Sequence::fromJson(const char* json, Sequence& out, std::string* error) {
     out.version = root["version"] | 1u;
     out.name = root["name"] | "";
     out.loop = root["loop"] | true;
+    out.autostart = root["autostart"] | false;
 
     const JsonArray steps = root["steps"].as<JsonArray>();
     if (steps.isNull()) {
@@ -142,6 +143,7 @@ std::string Sequence::toJson(const Sequence& seq) {
     root["version"] = seq.version;
     root["name"] = seq.name;
     root["loop"] = seq.loop;
+    root["autostart"] = seq.autostart;
 
     JsonArray steps = root.createNestedArray("steps");
     for (const auto& step : seq.steps) {

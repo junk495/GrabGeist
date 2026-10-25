@@ -34,6 +34,7 @@ struct Sequence {
     uint32_t version = 1;
     std::string name;
     bool loop = true;
+    bool autostart = false;   // Ablauf nach Reset automatisch starten
     std::vector<Step> steps;
 
     // JSON -> Sequence. Liefert false bei ungueltigem JSON/Schema.

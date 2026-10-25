@@ -905,6 +905,11 @@ void setup() {
     }
     loadSequence();
 
+    // Autostart: Ablauf ohne Handy-Eingriff starten (auch nach Reset).
+    if (currentSequence.autostart && !currentSequence.steps.empty()) {
+        startSequence();
+    }
+
     // Servo-Kalibrierung (am Modell verifiziert):
     // "Nach innen" (mechanischer Anschlag am jeweils anderen Servo):
     //   links = 500 us, rechts = 2500 us.

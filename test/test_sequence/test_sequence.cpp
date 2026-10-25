@@ -13,6 +13,7 @@ static Sequence makeFullSequence() {
     Sequence s;
     s.name = "Test-Show";
     s.loop = true;
+    s.autostart = true;
 
     Sequence::Step st;
     st.type = Sequence::StepType::PRESET;
@@ -36,6 +37,7 @@ void test_default_empty(void) {
     Sequence s;
     TEST_ASSERT_EQUAL_UINT32(1, s.version);
     TEST_ASSERT_TRUE(s.loop);
+    TEST_ASSERT_FALSE(s.autostart);
     TEST_ASSERT_TRUE(s.steps.empty());
 }
 
@@ -50,6 +52,7 @@ void test_roundtrip(void) {
     TEST_ASSERT_EQUAL_UINT32(1, out.version);
     TEST_ASSERT_EQUAL_STRING("Test-Show", out.name.c_str());
     TEST_ASSERT_TRUE(out.loop);
+    TEST_ASSERT_TRUE(out.autostart);
     TEST_ASSERT_EQUAL_UINT(2u, (unsigned)out.steps.size());
 
     TEST_ASSERT_TRUE(out.steps[0].type == Sequence::StepType::PRESET);
@@ -111,9 +114,21 @@ void test_version_mismatch(void) {
     TEST_ASSERT_FALSE(Sequence::fromJson(json, s, &err));
 }
 
+void test_autostart(void) {
+    Sequence s;
+    std::string err;
+    // explizit true
+    TEST_ASSERT_TRUE(Sequence::fromJson(R"({"version":1,"autostart":true,"steps":[]})", s, &err));
+    TEST_ASSERT_TRUE(s.autostart);
+    // Feld fehlt -> Standard false
+    TEST_ASSERT_TRUE(Sequence::fromJson(R"({"version":1,"steps":[]})", s, &err));
+    TEST_ASSERT_FALSE(s.autostart);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_default_empty);
+    RUN_TEST(test_autostart);
     RUN_TEST(test_roundtrip);
     RUN_TEST(test_speed_clamp);
     RUN_TEST(test_unknown_step_type);
