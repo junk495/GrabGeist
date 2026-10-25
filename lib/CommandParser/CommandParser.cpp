@@ -61,8 +61,12 @@ bool CommandParser::parse(const char* line, Command& out) {
         out.type = Command::Type::PEEK;
         if (equalsIgnoreCase(target, "left")) {
             out.peek = Command::Peek::LEFT;
+        } else if (equalsIgnoreCase(target, "leftplus")) {
+            out.peek = Command::Peek::LEFT_PLUS;
         } else if (equalsIgnoreCase(target, "right")) {
             out.peek = Command::Peek::RIGHT;
+        } else if (equalsIgnoreCase(target, "rightplus")) {
+            out.peek = Command::Peek::RIGHT_PLUS;
         } else if (equalsIgnoreCase(target, "top")) {
             out.peek = Command::Peek::TOP;
         } else if (equalsIgnoreCase(target, "hide")) {
@@ -137,16 +141,6 @@ bool CommandParser::parse(const char* line, Command& out) {
 
     if (equalsIgnoreCase(keyword, "RANDOM")) {
         out.type = Command::Type::RANDOM;
-        return true;
-    }
-
-    if (equalsIgnoreCase(keyword, "REC")) {
-        out.type = Command::Type::REC;
-        return true;
-    }
-
-    if (equalsIgnoreCase(keyword, "PLAY")) {
-        out.type = Command::Type::PLAY;
         return true;
     }
 

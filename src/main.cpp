@@ -81,6 +81,8 @@ static void saveMaxRate() {
 // ---------------------------------------------------------------------------
 static const float POS_LEFT_X  = -50.0f, POS_LEFT_Y  = 150.0f;
 static const float POS_RIGHT_X = 50.0f,  POS_RIGHT_Y = 150.0f;
+static const float POS_LEFT_PLUS_X  = -110.0f, POS_LEFT_PLUS_Y  = 135.0f;
+static const float POS_RIGHT_PLUS_X = 110.0f,  POS_RIGHT_PLUS_Y = 135.0f;
 
 // "Versteckt" als direkte Servo-Position (am Modell verifiziert).
 // Kollisionsgrenze: tiefer (= Kurbeln weiter aussen) beruehren sich die Arme.
@@ -140,35 +142,21 @@ static uint16_t autoStartL = 0, autoStartR = 0;
 static uint16_t autoTargetL = 0, autoTargetR = 0;
 
 // ---------------------------------------------------------------------------
-// Zufallsmodus: zufaellig hervor- und zurueckschauen (Versteckt / Links / Rechts / Oben).
+// Zufallsmodus: waehlt zufaellig eine der 6 Preset-Positionen
+// (Links+ / Links / Rechts / Rechts+ / Oben / Versteckt) und haelt dort kurz.
 // ---------------------------------------------------------------------------
 static const uint32_t RANDOM_PEEK_HOLD_MIN_MS = 800;
 static const uint32_t RANDOM_PEEK_HOLD_MAX_MS = 2500;
 static const uint32_t RANDOM_HIDE_HOLD_MIN_MS = 1500;
 static const uint32_t RANDOM_HIDE_HOLD_MAX_MS = 5000;
 
-enum class RandomStage { PEEK_MOVE, PEEK_HOLD, HIDE_MOVE, HIDE_HOLD };
+enum class RandomStage { MOVE, HOLD };
 
 static bool        randomActive = false;
-static RandomStage randomStage = RandomStage::HIDE_HOLD;
+static RandomStage randomStage = RandomStage::HOLD;
 static uint32_t    randomStageStart = 0;
 static uint32_t    randomHoldMs = 0;
-
-// ---------------------------------------------------------------------------
-// Record/Playback: Servo-Zielpulsbreiten aufnehmen und als Schleife abspielen.
-// ---------------------------------------------------------------------------
-static const uint32_t REC_INTERVAL_MS = 50;      // 20 Hz Abtastrate
-static const size_t   REC_MAX_SAMPLES = 1200;    // 60 s @ 20 Hz
-
-static uint16_t recPulseL[REC_MAX_SAMPLES];
-static uint16_t recPulseR[REC_MAX_SAMPLES];
-static size_t   recCount = 0;
-static bool     recActive = false;
-static uint32_t lastRecMs = 0;
-
-static bool     playbackActive = false;
-static size_t   playbackIndex = 0;
-static uint32_t lastPlaybackMs = 0;
+static bool        lastRandomWasHide = true;   // Startposition ist "versteckt"
 
 // ---------------------------------------------------------------------------
 // JSON-Ablauf (Sequence) - Zustand.
@@ -371,7 +359,6 @@ bool autoTargetPulses(int step, uint16_t& pulseL, uint16_t& pulseR) {
 void startAutoMode() {
     autoActive = true;
     randomActive = false;
-    playbackActive = false;
     wpActive = false;
     seqActive = false;
     autoStep = 0;
@@ -427,128 +414,70 @@ static uint32_t randBetween(uint32_t minIncl, uint32_t maxExcl) {
     return minIncl + (esp_random() % (maxExcl - minIncl));
 }
 
-// Zufaellige Peek-Position waehlen (links / rechts / oben).
-static void randomPeekPulses(uint16_t& pulseL, uint16_t& pulseR) {
-    const uint32_t pick = randBetween(0, 3);
-    if (pick == 0 && ikPulses(POS_LEFT_X, POS_LEFT_Y, pulseL, pulseR)) {
-        return;
+// Pulsbreiten fuer eine der 6 Preset-Positionen bestimmen.
+// Index: 0 links+, 1 links, 2 rechts, 3 rechts+, 4 oben, 5 versteckt.
+static bool presetPulses(int index, uint16_t& pulseL, uint16_t& pulseR) {
+    switch (index) {
+        case 0: return ikPulses(POS_LEFT_PLUS_X, POS_LEFT_PLUS_Y, pulseL, pulseR);
+        case 1: return ikPulses(POS_LEFT_X, POS_LEFT_Y, pulseL, pulseR);
+        case 2: return ikPulses(POS_RIGHT_X, POS_RIGHT_Y, pulseL, pulseR);
+        case 3: return ikPulses(POS_RIGHT_PLUS_X, POS_RIGHT_PLUS_Y, pulseL, pulseR);
+        case 4:  // oben (beide Kurbeln senkrecht)
+            pulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
+            pulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
+            return true;
+        case 5:  // versteckt
+            pulseL = HIDE_PULSE_L;
+            pulseR = HIDE_PULSE_R;
+            return true;
+        default:
+            return false;
     }
-    if (pick == 1 && ikPulses(POS_RIGHT_X, POS_RIGHT_Y, pulseL, pulseR)) {
-        return;
-    }
-    // Oben (beide Kurbeln senkrecht) als Standard/Fallback.
-    pulseL = servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f));
-    pulseR = servos.angleToPulseUsRight(Kinematics::degToRad(90.0f));
 }
 
 void startRandomMode() {
     randomActive = true;
     autoActive = false;
-    playbackActive = false;
     wpActive = false;
     seqActive = false;
     directMode = false;
-    randomStage = RandomStage::HIDE_MOVE;   // erst verstecken, dann loslegen
-    randomStageStart = millis();
+    // Erst verstecken, dann zufaellig aus den 6 Presets loslegen.
     setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);
+    lastRandomWasHide = true;
+    randomStage = RandomStage::MOVE;
+    randomStageStart = millis();
 }
 
 void updateRandomMode() {
     const uint32_t now = millis();
     switch (randomStage) {
-        case RandomStage::PEEK_MOVE:
+        case RandomStage::MOVE:
             // Warten, bis die Rampe das Ziel erreicht hat.
             if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
-                randomHoldMs = randBetween(RANDOM_PEEK_HOLD_MIN_MS, RANDOM_PEEK_HOLD_MAX_MS);
-                randomStage = RandomStage::PEEK_HOLD;
+                randomHoldMs = randBetween(
+                    lastRandomWasHide ? RANDOM_HIDE_HOLD_MIN_MS : RANDOM_PEEK_HOLD_MIN_MS,
+                    lastRandomWasHide ? RANDOM_HIDE_HOLD_MAX_MS : RANDOM_PEEK_HOLD_MAX_MS);
+                randomStage = RandomStage::HOLD;
                 randomStageStart = now;
             }
             break;
 
-        case RandomStage::PEEK_HOLD:
+        case RandomStage::HOLD:
             if (now - randomStageStart >= randomHoldMs) {
-                setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);
-                randomStage = RandomStage::HIDE_MOVE;
-            }
-            break;
-
-        case RandomStage::HIDE_MOVE:
-            if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
-                randomHoldMs = randBetween(RANDOM_HIDE_HOLD_MIN_MS, RANDOM_HIDE_HOLD_MAX_MS);
-                randomStage = RandomStage::HIDE_HOLD;
-                randomStageStart = now;
-            }
-            break;
-
-        case RandomStage::HIDE_HOLD:
-            if (now - randomStageStart >= randomHoldMs) {
+                const int pick = (int)randBetween(0, 6);
                 uint16_t pl, pr;
-                randomPeekPulses(pl, pr);
+                if (!presetPulses(pick, pl, pr)) {
+                    pl = HIDE_PULSE_L;
+                    pr = HIDE_PULSE_R;
+                    lastRandomWasHide = true;
+                } else {
+                    lastRandomWasHide = (pick == 5);
+                }
                 setTargetPulses(pl, pr);
-                randomStage = RandomStage::PEEK_MOVE;
+                randomStage = RandomStage::MOVE;
             }
             break;
     }
-}
-
-// ---------------------------------------------------------------------------
-// Record/Playback (nicht-blockierend).
-// ---------------------------------------------------------------------------
-void startRecording() {
-    recCount = 0;
-    recActive = true;
-    lastRecMs = 0;
-    playbackActive = false;   // nicht waehrend der Wiedergabe aufnehmen
-}
-
-void updateRecording() {
-    if (!recActive) {
-        return;
-    }
-    const uint32_t now = millis();
-    if (now - lastRecMs < REC_INTERVAL_MS) {
-        return;
-    }
-    lastRecMs = now;
-
-    if (recCount >= REC_MAX_SAMPLES) {
-        recActive = false;
-        if (!mapSending) {
-            char buf[48];
-            snprintf(buf, sizeof(buf), "REC full %u", (unsigned)recCount);
-            ble.sendLine(buf);
-        }
-        return;
-    }
-
-    recPulseL[recCount] = desiredPulseL;
-    recPulseR[recCount] = desiredPulseR;
-    ++recCount;
-}
-
-void startPlayback() {
-    if (recCount == 0) {
-        return;
-    }
-    playbackActive = true;
-    playbackIndex = 0;
-    lastPlaybackMs = 0;
-    recActive = false;
-    autoActive = false;
-    randomActive = false;
-    wpActive = false;
-    seqActive = false;
-    directMode = false;
-}
-
-void updatePlayback() {
-    const uint32_t now = millis();
-    if (now - lastPlaybackMs < REC_INTERVAL_MS) {
-        return;
-    }
-    lastPlaybackMs = now;
-    setTargetPulses(recPulseL[playbackIndex], recPulseR[playbackIndex]);
-    playbackIndex = (playbackIndex + 1) % recCount;   // als Schleife wiederholen
 }
 
 // ---------------------------------------------------------------------------
@@ -606,7 +535,6 @@ void startMoveTo(float x, float y, bool snap) {
 void doMoveCommand(float x, float y, bool snap) {
     autoActive = false;
     randomActive = false;
-    playbackActive = false;
     directMode = false;
     startMoveTo(x, y, snap);
 }
@@ -614,14 +542,19 @@ void doMoveCommand(float x, float y, bool snap) {
 void doPeekCommand(Command::Peek peek) {
     autoActive = false;
     randomActive = false;
-    playbackActive = false;
     directMode = false;
     switch (peek) {
+        case Command::Peek::LEFT_PLUS:
+            startMoveTo(POS_LEFT_PLUS_X, POS_LEFT_PLUS_Y, false);
+            break;
         case Command::Peek::LEFT:
             startMoveTo(POS_LEFT_X, POS_LEFT_Y, false);
             break;
         case Command::Peek::RIGHT:
             startMoveTo(POS_RIGHT_X, POS_RIGHT_Y, false);
+            break;
+        case Command::Peek::RIGHT_PLUS:
+            startMoveTo(POS_RIGHT_PLUS_X, POS_RIGHT_PLUS_Y, false);
             break;
         case Command::Peek::TOP:
             // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
@@ -641,7 +574,6 @@ void doPeekCommand(Command::Peek peek) {
 void doRawCommand(uint16_t pulseL, uint16_t pulseR) {
     autoActive = false;
     randomActive = false;
-    playbackActive = false;
     setServoDirect(pulseL, pulseR);
 }
 
@@ -765,8 +697,6 @@ static void startSequence() {
     seqWait = SeqWait::NONE;
     autoActive = false;
     randomActive = false;
-    playbackActive = false;
-    recActive = false;
     wpActive = false;
     directMode = false;
 }
@@ -935,8 +865,6 @@ void handleLine(const char* line) {
         case Command::Type::STOP:
             autoActive = false;
             randomActive = false;
-            playbackActive = false;
-            recActive = false;
             seqActive = false;
             servoSpeedPercent = 100.0f;   // Geschwindigkeit zuruecksetzen
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
@@ -956,30 +884,6 @@ void handleLine(const char* line) {
             } else {
                 startRandomMode();
                 ble.sendLine("RANDOM on");
-            }
-            break;
-
-        case Command::Type::REC:
-            if (recActive) {
-                recActive = false;
-                char buf[48];
-                snprintf(buf, sizeof(buf), "REC off %u", (unsigned)recCount);
-                ble.sendLine(buf);
-            } else {
-                startRecording();
-                ble.sendLine("REC on");
-            }
-            break;
-
-        case Command::Type::PLAY:
-            if (playbackActive) {
-                playbackActive = false;
-                ble.sendLine("PLAY off");
-            } else if (recCount == 0) {
-                ble.sendLine("PLAY empty");
-            } else {
-                startPlayback();
-                ble.sendLine("PLAY on");
             }
             break;
 
@@ -1112,8 +1016,6 @@ void loop() {
         updateAutoMode();
     } else if (randomActive) {
         updateRandomMode();
-    } else if (playbackActive) {
-        updatePlayback();
     } else {
         if (seqActive) {
             updateSequence();
@@ -1122,9 +1024,6 @@ void loop() {
             moveToPosition(wpPath[wpIndex].x, wpPath[wpIndex].y);
         }
     }
-
-    // Aufnahme (passiv): aktuelles Servo-Ziel in festem Takt abtasten.
-    updateRecording();
 
     // Servo-Ausgabe mit begrenzter Geschwindigkeit auf das Ziel fahren.
     updateServoRamp(dt);

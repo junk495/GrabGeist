@@ -52,15 +52,13 @@ Serial (Debug) und BLE-UART verarbeitet. Tasten/Joystick erzeugen intern dieselb
 
 ```
 MOVE <x> <y> [snap]        # Zielposition in mm (Default: smooth + A*-Pfad)
-PEEK <left|right|top|hide> # Preset-Kurzformen
+PEEK <leftplus|left|right|rightplus|top|hide> # Preset-Kurzformen
 RAW <l> <r>                # direkte Servo-Pulsbreiten [us] (500..2500)
 STOP                       # sofort verstecken / anhalten
 STATUS                     # aktueller Zustand ausgeben
 
 AUTO                       # fester Ablauf (links -> oben -> rechts -> versteckt)
-RANDOM                     # autonomer Zufallsmodus (toggle)
-REC                        # Aufnahme starten/stoppen (20 Hz)
-PLAY                       # Aufnahme als Schleife abspielen (toggle)
+RANDOM                     # Zufallsmodus: waehlt zufaellig eine der 6 Presets (toggle)
 
 RAMP [<us/s>]              # Servo-Rampe setzen/abfragen
 SPEED [<%>]                # Geschwindigkeit setzen/abfragen (skaliert unter der Rampe)

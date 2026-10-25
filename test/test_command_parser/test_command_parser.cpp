@@ -40,8 +40,14 @@ void test_peek(void) {
 
 void test_peek_all_targets(void) {
     Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("PEEK leftplus", c));
+    TEST_ASSERT_TRUE(c.peek == Command::Peek::LEFT_PLUS);
+    TEST_ASSERT_TRUE(CommandParser::parse("PEEK left", c));
+    TEST_ASSERT_TRUE(c.peek == Command::Peek::LEFT);
     TEST_ASSERT_TRUE(CommandParser::parse("PEEK right", c));
     TEST_ASSERT_TRUE(c.peek == Command::Peek::RIGHT);
+    TEST_ASSERT_TRUE(CommandParser::parse("PEEK rightplus", c));
+    TEST_ASSERT_TRUE(c.peek == Command::Peek::RIGHT_PLUS);
     TEST_ASSERT_TRUE(CommandParser::parse("PEEK top", c));
     TEST_ASSERT_TRUE(c.peek == Command::Peek::TOP);
     TEST_ASSERT_TRUE(CommandParser::parse("PEEK hide", c));
@@ -65,6 +71,8 @@ void test_invalid(void) {
     TEST_ASSERT_FALSE(CommandParser::parse("PEEK", c));           // Ziel fehlt
     TEST_ASSERT_FALSE(CommandParser::parse("PEEK banana", c));    // unbekanntes Ziel
     TEST_ASSERT_FALSE(CommandParser::parse("RAW 1500", c));       // rechter Puls fehlt
+    TEST_ASSERT_FALSE(CommandParser::parse("REC", c));            // entfernt
+    TEST_ASSERT_FALSE(CommandParser::parse("PLAY", c));           // entfernt
 }
 
 void test_raw(void) {
@@ -137,16 +145,6 @@ void test_random(void) {
     TEST_ASSERT_TRUE(c.type == Command::Type::RANDOM);
 }
 
-void test_rec_play(void) {
-    Command c;
-    TEST_ASSERT_TRUE(CommandParser::parse("REC", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::REC);
-    TEST_ASSERT_TRUE(CommandParser::parse("PLAY", c));
-    TEST_ASSERT_TRUE(c.type == Command::Type::PLAY);
-    TEST_ASSERT_TRUE(CommandParser::parse("play", c));   // klein geschrieben
-    TEST_ASSERT_TRUE(c.type == Command::Type::PLAY);
-}
-
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -163,6 +161,5 @@ int main(void) {
     RUN_TEST(test_ramp);
     RUN_TEST(test_speed);
     RUN_TEST(test_random);
-    RUN_TEST(test_rec_play);
     return UNITY_END();
 }

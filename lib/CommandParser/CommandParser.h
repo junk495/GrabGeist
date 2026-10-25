@@ -9,8 +9,8 @@
 
 // Geparster Befehl
 struct Command {
-    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, SPEED, RANDOM, REC, PLAY };
-    enum class Peek { LEFT, RIGHT, TOP, HIDE };
+    enum class Type { NONE, MOVE, PEEK, STOP, STATUS, RAW, AUTO, MAP, RESETLOG, RAMP, SPEED, RANDOM };
+    enum class Peek { LEFT_PLUS, LEFT, RIGHT, RIGHT_PLUS, TOP, HIDE };
 
     Type type = Type::NONE;
     float x = 0.0f;            // MOVE: Ziel X [mm]

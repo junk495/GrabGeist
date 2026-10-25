@@ -106,6 +106,22 @@ void test_lower_pocket_hysteresis(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.02f, Kinematics::degToRad(142.3f), tr);
 }
 
+// Preset-Positionen (aus main.cpp): die IK-getriebenen Presets muessen erreichbar sein.
+// ("Oben" und "Versteckt" sind direkte Servo-Stellungen und laufen nicht ueber die IK.)
+void test_preset_positions_reachable(void) {
+    const float presets[][2] = {
+        {-110.0f, 135.0f},  // links+
+        {-50.0f, 150.0f},   // links
+        {50.0f, 150.0f},    // rechts
+        {110.0f, 135.0f},   // rechts+
+        {0.0f, 35.0f},      // versteckt (Naeherung, per MOVE anfahrbar)
+    };
+    for (const auto& p : presets) {
+        float tl = 0.0f, tr = 0.0f;
+        TEST_ASSERT_TRUE(Kinematics::calculateIK(p[0], p[1], tl, tr));
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_ik_center);
@@ -118,5 +134,6 @@ int main(void) {
     RUN_TEST(test_servo_box_blocked);
     RUN_TEST(test_hysteresis);
     RUN_TEST(test_lower_pocket_hysteresis);
+    RUN_TEST(test_preset_positions_reachable);
     return UNITY_END();
 }
