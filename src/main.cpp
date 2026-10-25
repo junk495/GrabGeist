@@ -734,8 +734,9 @@ static void sendSequenceList() {
     const std::vector<std::string> names = listNamedSequences();
     Serial.printf("SEQ_LIST: %u Ablaeufe\n", (unsigned)names.size());
 
-    // Als EINE JSON-Zeile senden -> keine Reihenfolge-/Verlust-Probleme
-    // zwischen mehreren Einzelzeilen (SEQ_NAME ... / SEQ_LIST_DONE).
+    // Als EINE JSON-Zeile (inkl. Zeilenumbruch) in einem Rutsch senden.
+    // So kann kein zwischenzeitlicher setValue()-Aufruf den Puffer
+    // ueberschreiben, bevor NimBLE die Notification verschickt hat.
     DynamicJsonDocument doc(2048);
     JsonArray arr = doc.to<JsonArray>();
     for (const auto& n : names) {
@@ -743,9 +744,9 @@ static void sendSequenceList() {
     }
     std::string json;
     serializeJson(doc, json);
-    const std::string payload = "SEQ_LISTJSON " + json;
+    const std::string payload = "SEQ_LISTJSON " + json + "\n";
+    Serial.printf("TX: %s", payload.c_str());
     ble.sendChunked(payload.data(), payload.size());
-    ble.sendLine("");
 }
 
 static void startSequence() {
@@ -883,9 +884,8 @@ void handleLine(const char* line) {
         const char* name = line + 9;
         if (loadNamedSequence(name)) {
             const std::string json = Sequence::toJsonCompact(currentSequence);
-            const std::string payload = "SEQ_JSON " + json;
+            const std::string payload = "SEQ_JSON " + json + "\n";
             ble.sendChunked(payload.data(), payload.size());
-            ble.sendLine("");
         } else {
             ble.sendLine("SEQ_ERR notfound");
         }
