@@ -1155,4 +1155,26 @@ void loop() {
         }
         Serial.println(buf);
     }
+
+    // Live-Rueckmeldung an die App (500 ms): Zielposition + aktiver Schritt.
+    static uint32_t lastLiveSend = 0;
+    static float    lastLiveX = 1e9f, lastLiveY = 1e9f;
+    static int      lastLiveStep = -2;
+    if (!mapSending && now - lastLiveSend >= 500) {
+        lastLiveSend = now;
+        if (currentX != lastLiveX || currentY != lastLiveY) {
+            lastLiveX = currentX;
+            lastLiveY = currentY;
+            char buf[48];
+            snprintf(buf, sizeof(buf), "POS %.0f %.0f", (double)currentX, (double)currentY);
+            ble.sendLine(buf);
+        }
+        const int stepIdx = seqActive ? (int)(seqIndex > 0 ? seqIndex - 1 : 0) : -1;
+        if (stepIdx != lastLiveStep) {
+            lastLiveStep = stepIdx;
+            char buf[32];
+            snprintf(buf, sizeof(buf), "SEQ_STEP %d", stepIdx);
+            ble.sendLine(buf);
+        }
+    }
 }
