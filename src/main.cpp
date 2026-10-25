@@ -657,6 +657,88 @@ static void loadSequence() {
     Sequence::fromJson(s.c_str(), currentSequence);
 }
 
+// ---------------------------------------------------------------------------
+// Benannte Ablaeufe (Bibliothek): mehrere Sequenzen dauerhaft auf der ESP
+// ablegen -> unabhaengig von Handy/PC. Gespeichert unter /seq/<name>.json.
+// ---------------------------------------------------------------------------
+static const char* kSeqDir = "/seq";
+
+static std::string sanitizeSeqName(const std::string& name) {
+    std::string out;
+    for (char c : name) {
+        if (c == '/' || c == '\\' || c == '\0' || c == '\n' || c == '\r') {
+            out += '_';
+        } else {
+            out += c;
+        }
+    }
+    if (out.empty()) {
+        out = "seq";
+    }
+    return out;
+}
+
+static std::string seqFilePath(const std::string& name) {
+    return std::string(kSeqDir) + "/" + sanitizeSeqName(name) + ".json";
+}
+
+static bool saveNamedSequence(const std::string& name) {
+    currentSequence.name = name;
+    File f = LittleFS.open(seqFilePath(name).c_str(), "w");
+    if (!f) {
+        return false;
+    }
+    const std::string json = Sequence::toJson(currentSequence);
+    f.print(json.c_str());
+    f.close();
+    return true;
+}
+
+static bool loadNamedSequence(const std::string& name) {
+    File f = LittleFS.open(seqFilePath(name).c_str(), "r");
+    if (!f) {
+        return false;
+    }
+    const String s = f.readString();
+    f.close();
+    return Sequence::fromJson(s.c_str(), currentSequence);
+}
+
+static bool deleteNamedSequence(const std::string& name) {
+    return LittleFS.remove(seqFilePath(name).c_str());
+}
+
+static std::vector<std::string> listNamedSequences() {
+    std::vector<std::string> names;
+    File dir = LittleFS.open(kSeqDir);
+    if (!dir) {
+        return names;
+    }
+    File f = dir.openNextFile();
+    while (f) {
+        if (!f.isDirectory()) {
+            std::string n = f.name();
+            const size_t slash = n.find_last_of('/');
+            if (slash != std::string::npos) {
+                n = n.substr(slash + 1);
+            }
+            if (n.size() > 5 && n.compare(n.size() - 5, 5, ".json") == 0) {
+                names.push_back(n.substr(0, n.size() - 5));
+            }
+        }
+        f = dir.openNextFile();
+    }
+    return names;
+}
+
+static void sendSequenceList() {
+    const std::vector<std::string> names = listNamedSequences();
+    for (const auto& n : names) {
+        ble.sendLine(("SEQ_NAME " + n).c_str());
+    }
+    ble.sendLine("SEQ_LIST_DONE");
+}
+
 static void startSequence() {
     if (currentSequence.steps.empty()) return;
     seqActive = true;
@@ -771,6 +853,42 @@ void handleLine(const char* line) {
                  currentSequence.autostart ? 1 : 0,
                  (unsigned)currentSequence.steps.size());
         ble.sendLine(buf);
+        return;
+    }
+    if (std::strncmp(line, "SEQ_SAVE ", 9) == 0) {
+        const char* name = line + 9;
+        if (*name == '\0') {
+            ble.sendLine("SEQ_ERR empty");
+        } else if (saveNamedSequence(name)) {
+            ble.sendLine("SEQ_SAVED");
+        } else {
+            ble.sendLine("SEQ_ERR write");
+        }
+        return;
+    }
+    if (std::strcmp(line, "SEQ_LIST") == 0) {
+        sendSequenceList();
+        return;
+    }
+    if (std::strncmp(line, "SEQ_LOAD ", 9) == 0) {
+        const char* name = line + 9;
+        if (loadNamedSequence(name)) {
+            const std::string json = Sequence::toJsonCompact(currentSequence);
+            const std::string payload = "SEQ_JSON " + json;
+            ble.sendChunked(payload.data(), payload.size());
+            ble.sendLine("");
+        } else {
+            ble.sendLine("SEQ_ERR notfound");
+        }
+        return;
+    }
+    if (std::strncmp(line, "SEQ_DELETE ", 11) == 0) {
+        const char* name = line + 11;
+        if (deleteNamedSequence(name)) {
+            ble.sendLine("SEQ_DELETED");
+        } else {
+            ble.sendLine("SEQ_ERR notfound");
+        }
         return;
     }
 
@@ -912,6 +1030,7 @@ void setup() {
     if (!LittleFS.begin(true)) {
         Serial.println("LittleFS mount fehlgeschlagen");
     }
+    LittleFS.mkdir(kSeqDir);   // Ordner fuer benannte Ablaeufe anlegen
     loadSequence();
 
     // Autostart: Ablauf ohne Handy-Eingriff starten (auch nach Reset).

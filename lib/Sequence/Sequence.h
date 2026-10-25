@@ -43,6 +43,9 @@ struct Sequence {
     // Sequence -> JSON-String (lesbar, fuer Export/Datei).
     static std::string toJson(const Sequence& seq);
 
+    // Sequence -> kompakter JSON-String (ohne Zeilenumbrueche, fuer BLE-Transfer).
+    static std::string toJsonCompact(const Sequence& seq);
+
     // Normalisiert (speed auf [0,100] klemmen) und prueft das Schema.
     static bool validate(Sequence& seq, std::string* error = nullptr);
 };

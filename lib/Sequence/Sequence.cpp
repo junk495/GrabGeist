@@ -35,6 +35,35 @@ bool isValidPresetName(const std::string& name) {
     return name == "left" || name == "right" || name == "hide";
 }
 
+void serializeToDoc(const Sequence& seq, JsonDocument& doc) {
+    JsonObject root = doc.to<JsonObject>();
+    root["version"] = seq.version;
+    root["name"] = seq.name;
+    root["loop"] = seq.loop;
+    root["autostart"] = seq.autostart;
+
+    JsonArray steps = root.createNestedArray("steps");
+    for (const auto& step : seq.steps) {
+        JsonObject o = steps.createNestedObject();
+        switch (step.type) {
+            case Sequence::StepType::MOVE:
+                o["type"] = "move";
+                o["x"] = step.move.x;
+                o["y"] = step.move.y;
+                o["speed"] = step.move.speed;
+                o["holdMs"] = step.move.holdMs;
+                break;
+
+            case Sequence::StepType::PRESET:
+                o["type"] = "preset";
+                o["name"] = step.preset.name;
+                o["speed"] = step.preset.speed;
+                o["holdMs"] = step.preset.holdMs;
+                break;
+        }
+    }
+}
+
 }  // namespace
 
 bool Sequence::validate(Sequence& seq, std::string* error) {
@@ -139,34 +168,18 @@ bool Sequence::fromJson(const char* json, Sequence& out, std::string* error) {
 
 std::string Sequence::toJson(const Sequence& seq) {
     DynamicJsonDocument doc(kJsonCapacity);
-    JsonObject root = doc.to<JsonObject>();
-    root["version"] = seq.version;
-    root["name"] = seq.name;
-    root["loop"] = seq.loop;
-    root["autostart"] = seq.autostart;
-
-    JsonArray steps = root.createNestedArray("steps");
-    for (const auto& step : seq.steps) {
-        JsonObject o = steps.createNestedObject();
-        switch (step.type) {
-            case StepType::MOVE:
-                o["type"] = "move";
-                o["x"] = step.move.x;
-                o["y"] = step.move.y;
-                o["speed"] = step.move.speed;
-                o["holdMs"] = step.move.holdMs;
-                break;
-
-            case StepType::PRESET:
-                o["type"] = "preset";
-                o["name"] = step.preset.name;
-                o["speed"] = step.preset.speed;
-                o["holdMs"] = step.preset.holdMs;
-                break;
-        }
-    }
+    serializeToDoc(seq, doc);
 
     std::string result;
     serializeJsonPretty(doc, result);
+    return result;
+}
+
+std::string Sequence::toJsonCompact(const Sequence& seq) {
+    DynamicJsonDocument doc(kJsonCapacity);
+    serializeToDoc(seq, doc);
+
+    std::string result;
+    serializeJson(doc, result);
     return result;
 }

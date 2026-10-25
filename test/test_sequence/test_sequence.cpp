@@ -125,10 +125,24 @@ void test_autostart(void) {
     TEST_ASSERT_FALSE(s.autostart);
 }
 
+void test_to_json_compact(void) {
+    Sequence s = makeFullSequence();
+    std::string json = Sequence::toJsonCompact(s);
+    // kompakt: keine Zeilenumbrueche (wichtig fuer den BLE-Zeilentransfer)
+    TEST_ASSERT_TRUE(json.find('\n') == std::string::npos);
+    // und trotzdem korrekt zurueck lesbar
+    Sequence out;
+    std::string err;
+    TEST_ASSERT_TRUE(Sequence::fromJson(json.c_str(), out, &err));
+    TEST_ASSERT_TRUE(out.autostart);
+    TEST_ASSERT_EQUAL_UINT(2u, (unsigned)out.steps.size());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_default_empty);
     RUN_TEST(test_autostart);
+    RUN_TEST(test_to_json_compact);
     RUN_TEST(test_roundtrip);
     RUN_TEST(test_speed_clamp);
     RUN_TEST(test_unknown_step_type);
