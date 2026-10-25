@@ -8,6 +8,7 @@
 #include <esp_random.h>   // esp_random() fuer den Zufallsmodus
 #include <Preferences.h>
 #include <LittleFS.h>
+#include <dirent.h>
 
 #include <ArduinoJson.h>
 #include <CommandParser.h>
@@ -710,24 +711,22 @@ static bool deleteNamedSequence(const std::string& name) {
 
 static std::vector<std::string> listNamedSequences() {
     std::vector<std::string> names;
-    File dir = LittleFS.open(kSeqDir);
-    if (!dir) {
+    const char* mp = LittleFS.mountpoint();
+    const std::string dirPath = (mp ? std::string(mp) : std::string("")) + kSeqDir;
+    DIR* dir = opendir(dirPath.c_str());
+    if (dir == nullptr) {
         return names;
     }
-    File f = dir.openNextFile();
-    while (f) {
-        if (!f.isDirectory()) {
-            std::string n = f.name();
-            const size_t slash = n.find_last_of('/');
-            if (slash != std::string::npos) {
-                n = n.substr(slash + 1);
-            }
-            if (n.size() > 5 && n.compare(n.size() - 5, 5, ".json") == 0) {
-                names.push_back(n.substr(0, n.size() - 5));
-            }
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        const std::string n = entry->d_name;
+        // Nur .json-Dateien zaehlen (ueber den Namen, nicht ueber d_type:
+        // LittleFS liefert d_type teilweise als DT_UNKNOWN).
+        if (n.size() > 5 && n.compare(n.size() - 5, 5, ".json") == 0) {
+            names.push_back(n.substr(0, n.size() - 5));
         }
-        f = dir.openNextFile();
     }
+    closedir(dir);
     return names;
 }
 
