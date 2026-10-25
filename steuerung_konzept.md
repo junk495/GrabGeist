@@ -59,6 +59,7 @@ STATUS                     # aktueller Zustand ausgeben
 
 AUTO                       # fester Ablauf (links -> oben -> rechts -> versteckt)
 RANDOM                     # Zufallsmodus: waehlt zufaellig eine der 6 Presets (toggle)
+PROGRANDOM                 # Positionen des Ablaufs in zufaelliger Reihenfolge (toggle)
 
 RAMP [<us/s>]              # Servo-Rampe setzen/abfragen
 SPEED [<%>]                # Geschwindigkeit setzen/abfragen (skaliert unter der Rampe)

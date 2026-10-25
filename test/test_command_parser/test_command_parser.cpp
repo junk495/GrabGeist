@@ -145,6 +145,14 @@ void test_random(void) {
     TEST_ASSERT_TRUE(c.type == Command::Type::RANDOM);
 }
 
+void test_prograndom(void) {
+    Command c;
+    TEST_ASSERT_TRUE(CommandParser::parse("PROGRANDOM", c));
+    TEST_ASSERT_TRUE(c.type == Command::Type::PROGRANDOM);
+    TEST_ASSERT_TRUE(CommandParser::parse("prograndom", c));   // klein geschrieben
+    TEST_ASSERT_TRUE(c.type == Command::Type::PROGRANDOM);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_move);
@@ -161,5 +169,6 @@ int main(void) {
     RUN_TEST(test_ramp);
     RUN_TEST(test_speed);
     RUN_TEST(test_random);
+    RUN_TEST(test_prograndom);
     return UNITY_END();
 }

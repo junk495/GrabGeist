@@ -144,5 +144,10 @@ bool CommandParser::parse(const char* line, Command& out) {
         return true;
     }
 
+    if (equalsIgnoreCase(keyword, "PROGRANDOM")) {
+        out.type = Command::Type::PROGRANDOM;
+        return true;
+    }
+
     return false;   // unbekanntes Kommando
 }

@@ -159,6 +159,19 @@ static uint32_t    randomHoldMs = 0;
 static bool        lastRandomWasHide = true;   // Startposition ist "versteckt"
 
 // ---------------------------------------------------------------------------
+// Programm-Zufallsmodus: besucht die Positionen des geladenen Ablaufs in
+// zufaelliger Reihenfolge (versteckt -> zufaellige Pause -> Position ->
+// zufaellige Haltezeit). Geschwindigkeit immer 100 %.
+// ---------------------------------------------------------------------------
+enum class ProgRandStage { HIDE_MOVE, HIDE_HOLD, PEEK_MOVE, PEEK_HOLD };
+
+static bool              progRandomActive = false;
+static ProgRandStage     progRandStage = ProgRandStage::HIDE_HOLD;
+static uint32_t          progRandStageStart = 0;
+static uint32_t          progRandHoldMs = 0;
+static std::vector<Point> progRandPositions;   // Positionen aus dem Ablauf
+
+// ---------------------------------------------------------------------------
 // JSON-Ablauf (Sequence) - Zustand.
 // ---------------------------------------------------------------------------
 enum class SeqWait { NONE, DELAY, ARRIVAL };
@@ -359,6 +372,7 @@ bool autoTargetPulses(int step, uint16_t& pulseL, uint16_t& pulseR) {
 void startAutoMode() {
     autoActive = true;
     randomActive = false;
+    progRandomActive = false;
     wpActive = false;
     seqActive = false;
     autoStep = 0;
@@ -438,6 +452,7 @@ static bool presetPulses(int index, uint16_t& pulseL, uint16_t& pulseR) {
 void startRandomMode() {
     randomActive = true;
     autoActive = false;
+    progRandomActive = false;
     wpActive = false;
     seqActive = false;
     directMode = false;
@@ -475,6 +490,95 @@ void updateRandomMode() {
                 }
                 setTargetPulses(pl, pr);
                 randomStage = RandomStage::MOVE;
+            }
+            break;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Programm-Zufallsmodus (nicht-blockierend).
+// ---------------------------------------------------------------------------
+
+// Positionen des geladenen Ablaufs sammeln (nur die Koordinaten, ohne
+// Speed/Haltezeit). Nur IK-erreichbare Positionen werden uebernommen.
+static void collectProgramPositions() {
+    progRandPositions.clear();
+    for (const Sequence::Step& step : currentSequence.steps) {
+        float x = 0.0f, y = 0.0f;
+        bool have = false;
+        if (step.type == Sequence::StepType::MOVE) {
+            x = step.move.x;
+            y = step.move.y;
+            have = true;
+        } else if (step.type == Sequence::StepType::PRESET) {
+            if (step.preset.name == "leftplus") {
+                x = POS_LEFT_PLUS_X; y = POS_LEFT_PLUS_Y; have = true;
+            } else if (step.preset.name == "left") {
+                x = POS_LEFT_X; y = POS_LEFT_Y; have = true;
+            } else if (step.preset.name == "right") {
+                x = POS_RIGHT_X; y = POS_RIGHT_Y; have = true;
+            } else if (step.preset.name == "rightplus") {
+                x = POS_RIGHT_PLUS_X; y = POS_RIGHT_PLUS_Y; have = true;
+            } else if (step.preset.name == "hide") {
+                x = hideX; y = hideY; have = true;
+            }
+            // "top" ist eine direkte Servo-Stellung und wird uebersprungen.
+        }
+        if (have && Kinematics::isReachable(x, y)) {
+            progRandPositions.push_back({x, y});
+        }
+    }
+}
+
+void startProgRandomMode() {
+    progRandomActive = true;
+    autoActive = false;
+    randomActive = false;
+    wpActive = false;
+    seqActive = false;
+    directMode = false;
+    servoSpeedPercent = 100.0f;   // Geschwindigkeit immer 100 %
+    collectProgramPositions();
+    setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);   // erst verstecken
+    progRandStage = ProgRandStage::HIDE_MOVE;
+    progRandStageStart = millis();
+}
+
+void updateProgRandomMode() {
+    if (progRandPositions.empty()) {
+        progRandomActive = false;
+        return;
+    }
+    const uint32_t now = millis();
+    switch (progRandStage) {
+        case ProgRandStage::HIDE_MOVE:
+            if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
+                progRandHoldMs = randBetween(RANDOM_HIDE_HOLD_MIN_MS, RANDOM_HIDE_HOLD_MAX_MS);
+                progRandStage = ProgRandStage::HIDE_HOLD;
+                progRandStageStart = now;
+            }
+            break;
+
+        case ProgRandStage::HIDE_HOLD:
+            if (now - progRandStageStart >= progRandHoldMs) {
+                const size_t idx = (size_t)randBetween(0, (uint32_t)progRandPositions.size());
+                moveToPosition(progRandPositions[idx].x, progRandPositions[idx].y);
+                progRandStage = ProgRandStage::PEEK_MOVE;
+            }
+            break;
+
+        case ProgRandStage::PEEK_MOVE:
+            if (outputPulseL == desiredPulseL && outputPulseR == desiredPulseR) {
+                progRandHoldMs = randBetween(RANDOM_PEEK_HOLD_MIN_MS, RANDOM_PEEK_HOLD_MAX_MS);
+                progRandStage = ProgRandStage::PEEK_HOLD;
+                progRandStageStart = now;
+            }
+            break;
+
+        case ProgRandStage::PEEK_HOLD:
+            if (now - progRandStageStart >= progRandHoldMs) {
+                setTargetPulses(HIDE_PULSE_L, HIDE_PULSE_R);
+                progRandStage = ProgRandStage::HIDE_MOVE;
             }
             break;
     }
@@ -535,6 +639,7 @@ void startMoveTo(float x, float y, bool snap) {
 void doMoveCommand(float x, float y, bool snap) {
     autoActive = false;
     randomActive = false;
+    progRandomActive = false;
     directMode = false;
     startMoveTo(x, y, snap);
 }
@@ -542,6 +647,7 @@ void doMoveCommand(float x, float y, bool snap) {
 void doPeekCommand(Command::Peek peek) {
     autoActive = false;
     randomActive = false;
+    progRandomActive = false;
     directMode = false;
     switch (peek) {
         case Command::Peek::LEFT_PLUS:
@@ -574,6 +680,7 @@ void doPeekCommand(Command::Peek peek) {
 void doRawCommand(uint16_t pulseL, uint16_t pulseR) {
     autoActive = false;
     randomActive = false;
+    progRandomActive = false;
     setServoDirect(pulseL, pulseR);
 }
 
@@ -697,6 +804,7 @@ static void startSequence() {
     seqWait = SeqWait::NONE;
     autoActive = false;
     randomActive = false;
+    progRandomActive = false;
     wpActive = false;
     directMode = false;
 }
@@ -865,6 +973,7 @@ void handleLine(const char* line) {
         case Command::Type::STOP:
             autoActive = false;
             randomActive = false;
+            progRandomActive = false;
             seqActive = false;
             servoSpeedPercent = 100.0f;   // Geschwindigkeit zuruecksetzen
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
@@ -884,6 +993,20 @@ void handleLine(const char* line) {
             } else {
                 startRandomMode();
                 ble.sendLine("RANDOM on");
+            }
+            break;
+
+        case Command::Type::PROGRANDOM:
+            if (progRandomActive) {
+                progRandomActive = false;
+                servoSpeedPercent = 100.0f;
+                setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+                ble.sendLine("PROGRANDOM off");
+            } else if (currentSequence.steps.empty()) {
+                ble.sendLine("PROGRANDOM empty");
+            } else {
+                startProgRandomMode();
+                ble.sendLine("PROGRANDOM on");
             }
             break;
 
@@ -1016,6 +1139,8 @@ void loop() {
         updateAutoMode();
     } else if (randomActive) {
         updateRandomMode();
+    } else if (progRandomActive) {
+        updateProgRandomMode();
     } else {
         if (seqActive) {
             updateSequence();

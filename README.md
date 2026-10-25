@@ -34,13 +34,14 @@ Inverse Kinematik in Echtzeit und weicht Hindernissen (den Servogehäusen) autom
 - **Servo-Anfahrrampe** – einstellbare Beschleunigungs-/Geschwindigkeitsbegrenzung
   (verhindert Stromspitzen/Brownouts)
 - **Hysterese** – verhindert Konfigurationssprünge der Servos während der Bewegung
-- **Betriebsmodi** – `AUTO` (fester Ablauf), `RANDOM` (zufällige Position aus den 6 Presets)
+- **Betriebsmodi** – `AUTO` (fester Ablauf), `RANDOM` (zufällige Position aus den 6 Presets),
+  `PROGRANDOM` (Positionen des Ablaufs in zufälliger Reihenfolge)
 - **Ablauf-Editor** – JSON-Sequenzen (Move-/Preset-Schritte mit Speed + Haltezeit);
   mehrere benannte Abläufe persistent auf der ESP (`/seq/<name>.json`), `loop` + `autostart`,
   Export/Import als JSON
 - **Reset-Diagnose** – Reset-Grund wird persistent in NVS gespeichert und per BLE abrufbar
-- **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `RANDOM`, `RAMP`,
-  `SPEED`, `SEQ_SET`/`SEQ_RUN`/`SEQ_STOP`/`SEQ_GET`/`SEQ_SAVE`/`SEQ_LIST`/
+- **BLE-Steuerung** – Textbefehle (`MOVE`, `PEEK`, `STOP`, `RAW`, `AUTO`, `RANDOM`, `PROGRANDOM`,
+  `RAMP`, `SPEED`, `SEQ_SET`/`SEQ_RUN`/`SEQ_STOP`/`SEQ_GET`/`SEQ_SAVE`/`SEQ_LIST`/
   `SEQ_LOAD`/`SEQ_DELETE`, …)
 
 ## Tech-Stack
