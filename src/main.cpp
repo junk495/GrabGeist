@@ -103,6 +103,11 @@ static bool     wpActive = false;
 static float currentX = 0.0f;
 static float currentY = 170.0f;
 
+// Referenz-Positionen (mm) fuer die Live-Anzeige: "Oben" (beide Kurbeln 90°)
+// und "Versteckt" (verifizierte Pulsbreiten). Werden in setup() berechnet.
+static float topX = 0.0f, topY = 0.0f;
+static float hideX = 0.0f, hideY = 0.0f;
+
 // Zuletzt an die Servo-Pins ausgegebene PWM-Pulsbreiten (fuer die Monitor-Ausgabe).
 static uint16_t lastPulseL = 0;
 static uint16_t lastPulseR = 0;
@@ -622,9 +627,13 @@ void doPeekCommand(Command::Peek peek) {
             // Referenz: beide Kurbeln senkrecht nach oben (theta = 90°).
             setServoDirect(servos.angleToPulseUsLeft(Kinematics::degToRad(90.0f)),
                            servos.angleToPulseUsRight(Kinematics::degToRad(90.0f)));
+            currentX = topX;
+            currentY = topY;
             break;
         case Command::Peek::HIDE:
             setServoDirect(HIDE_PULSE_L, HIDE_PULSE_R);
+            currentX = hideX;
+            currentY = hideY;
             break;
     }
 }
@@ -1058,6 +1067,15 @@ void setup() {
     // bzw. theta = +15.75° (rechts). Keine Invertierung.
     servos.setCalibrationLeft(Kinematics::degToRad(162.90f), false);
     servos.setCalibrationRight(Kinematics::degToRad(15.75f), false);
+
+    // Referenz-Positionen fuer die Live-Anzeige berechnen.
+    Kinematics::forwardKinematics(Kinematics::degToRad(90.0f),
+                                  Kinematics::degToRad(90.0f), topX, topY);
+    const float hideThetaL = servos.pulseToAngleUsLeft(HIDE_PULSE_L);
+    const float hideThetaR = servos.pulseToAngleUsRight(HIDE_PULSE_R);
+    Kinematics::forwardKinematics(hideThetaL, hideThetaR, hideX, hideY);
+    currentX = hideX;   // beim Boot ist der Geist "versteckt"
+    currentY = hideY;
 
     const bool ledcL = ledcAttach(PIN_SERVO_LEFT,  SERVO_FREQ_HZ, SERVO_RES_BITS);
     const bool ledcR = ledcAttach(PIN_SERVO_RIGHT, SERVO_FREQ_HZ, SERVO_RES_BITS);
