@@ -53,9 +53,10 @@
 | C2 | Keramik | 100 nF / 16 V | 0603 | parallel zu C1 |
 | J2, J3 | Servo-Anschlüsse | 3-pol 2,54 mm | SMD | JR/Futaba-kompatibel (GND/V+/Signal) |
 | C3, C4 | Stütz-Elko je Servo | 100 µF / 16 V | SMD-Elko | nah am Stecker |
-| U1 | 5V-Buck | AP63205 (fest 5 V, 2 A) | SOT-563 | alternativ MP2315/TPS563201 |
+| U1 | 5V-Buck | AP63205 (fest 5 V, 2 A, 1,1 MHz) | TSOT26 (SOT-23-6) | alternativ MP2315/TPS563201 |
 | L1 | Induktivität | 10 µH, Isat ≥ 2 A | SMD | laut Buck-Datenblatt |
 | C5 | CIN | 10 µF / 25 V X7R | 0805 | nah an VIN |
+| CBST | Bootstrap | 0,1 µF / 16 V X7R | 0603 | zwischen BST und SW |
 | C6, C7 | COUT | 2× 22 µF / 16 V X7R | 0805 | low ESR |
 | R1 | EN-Pull-up | 100 k | 0603 | VIN → EN |
 | R2 | Teiler oben | 100 k (1 %) | 0603 | V_BAT → ADC |
@@ -64,6 +65,54 @@
 | J4, J5 | DevKit-Sockel | 2× Female-Header 2,54 mm | THT | die einzige „gesteckte" Ausnahme |
 
 > Teilenummern (LCSC `C…`) im EasyEDA-Pro-Katalog auswählen.
+
+### 5.1 AP63205 — Pinbelegung & Beschaltung
+
+**Gehäuse:** TSOT26 (SOT-23-6), Top View · **Frequenz:** 1,1 MHz · **Ausgang:** fest 5,0 V.
+
+| Pin | Name | Funktion |
+|---|---|---|
+| 1 | FB | Feedback |
+| 2 | EN | Enable |
+| 3 | VIN | Eingangsspannung |
+| 4 | GND | Masse |
+| 5 | SW | Schaltknoten (zur Induktivität) |
+| 6 | BST | Bootstrap |
+
+```
+         FB        EN       VIN
+        [1]       [2]       [3]
+       ┌────────────────────────┐
+       │                        │
+       └────────────────────────┘
+        [6]       [5]       [4]
+        BST        SW       GND
+```
+
+**Beschaltung (typische Anwendung, fest 5 V):**
+
+```
+V_BAT ──┬── CIN (10 µF + 0,1 µF) ─── GND
+        ├── VIN (3)
+EN (2) ─┤   (an VIN für „immer an", optional UVLO-Teiler VIN→EN→GND)
+        │
+BST (6)─┴── CBST (0,1 µF) ── SW (5)
+SW (5) ───── L (10 µH) ──┬── VOUT (5 V)
+                         ├── COUT (2× 22 µF) ── GND
+                         └── FB (1)   ← direkt an VOUT
+GND (4) ─── GND
+```
+
+- **VIN (3):** an V_BAT (6,0–8,4 V). `CIN = 10 µF (X7R)` + 0,1 µF direkt am Pin.
+- **GND (4):** gemeinsame Masse (GND-Fläche).
+- **EN (2):** HIGH = ein. Für „immer an" direkt an VIN bzw. über den 100-k-Pull-up; optional UVLO-Teiler.
+- **BST (6):** Bootstrap-Kondensator `CBST = 0,1 µF (X7R)` zwischen **BST und SW**.
+- **SW (5):** Schaltknoten → `L = 10 µH` → Ausgang (bei 1,1 MHz sind 6,8–10 µH üblich).
+- **FB (1):** bei festem 5-V-Ausgang **direkt an VOUT** — **kein** externer Teiler.
+- **Ausgang:** `COUT = 2× 22 µF (X7R)` gegen GND.
+
+> Pin-Nummerierung und Beschaltungsbild im EasyEDA-Pro-Symbol (LCSC-Bauteil AP63205WU-7)
+> und dem verlinkten Datenblatt gegenprüfen.
 
 ## 6. Verbindungen / Pinbelegung
 
