@@ -223,6 +223,7 @@ V_BAT (geschützte VCC) ──► R2 (100 k) ──┬──► GPIO6 (ADC1_CH5)
 
 - PWM: **50 Hz**, **14 Bit** (LEDC), Pulsbreite 500–2500 µs (`SERVO_RES_BITS = 14`).
 - 5 V vom Buck auf den **5V-Pin** (nicht 3V3). Ein gemeinsamer Ground für alles.
+- **GPIO7 (ADC1_CH6)** = Akustik-Trigger (siehe `akustik_trigger.md`).
 
 ## 7. Spannungsüberwachung (ADC-Teiler)
 

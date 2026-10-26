@@ -6,7 +6,7 @@
 
 ## Status
 
-**In Planung.** Erster Baustein: **Stromversorgung** (`power_design.md`).
+**In Planung.** Bausteine: **Stromversorgung** (`power_design.md`) und **Akustischer Schussknall-Trigger** (`akustik_trigger.md`).
 
 ## Module
 

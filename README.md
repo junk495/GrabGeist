@@ -80,12 +80,13 @@ pio test -e test              # Unit-Tests (nativ)
 | `kinematik_konzept.md` | IK-Briefing (Formeln, Beispiele) |
 | `steuerung_konzept.md` | Steuerungskonzept (Tasten/BLE/Joystick) |
 | `verkabelung.md` | Verkabelung & Stromversorgung (Probeaufbau/Ist-Zustand) |
-| `pcb/` | PCB-Design (Planung, startet mit der Stromversorgung) |
+| `pcb/` | PCB-Design (Stromversorgung, Akustik-Trigger, …) |
 
 ## Roadmap
 
 Ideen für die nächsten Schritte (noch nicht umgesetzt):
 
+- **Akustischer Schussknall-Trigger** – Geist reagiert auf einen Knall (in Arbeit, PCB: `pcb/akustik_trigger.md`).
 - **Bewegungsauslöser (PIR-Sensor)** – Geist reagiert auf Näherung.
 - **Physische Taste(n)** – „Verstecken/Stopp" (blind bedienbar) und ggf. Peek-Tasten.
 - **Parameter-Persistenz (NVS)** – Rampe/Zufalls-Dauern speichern.
