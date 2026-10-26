@@ -105,3 +105,51 @@
   Schwellen-Erkennung unkritisch.
 - Optional: Ferrit/RC vor +3V3 der Analogsektion für saubereres AVCC (bei Schwellen-Trigger meist nicht nötig).
 
+## 10. Schaltplan & Verdrahtung (EasyEDA-Umsetzung)
+
+**Signalfluss:**
+
+```
+MIC1 ──► [C1/R2 Hochpass] ──► [U1A Verstärker] ──► [D1/C2/R5 Peak] ──► ADC (GPIO7)
+Elektret   fc ≈ 1,6 kHz         AC ×101 / DC ×1        τ ≈ 1 ms          0–3,1 V
+```
+
+**Komponenten-Verdrahtung (Pin → Netz):**
+
+| Bauteil | Pin | Ziel-Netz |
+|---|---|---|
+| MIC1 | + | `MIC_RAW` |
+| MIC1 | − | `GND` |
+| R1 2,2k | 1 | `+3V3` (über JP1) |
+| R1 2,2k | 2 | `MIC_RAW` |
+| C1 10n | 1 | `MIC_RAW` |
+| C1 10n | 2 | `AMP_IN_P` |
+| R2 10k | 1 | `AMP_IN_P` |
+| R2 10k | 2 | `GND` |
+| U1 MCP602 | 1 OUTA | `AMP_OUT` |
+| U1 | 2 INA− | `AMP_IN_N` |
+| U1 | 3 INA+ | `AMP_IN_P` |
+| U1 | 4 VSS | `GND` |
+| U1 | 5 INB+ | `GND` |
+| U1 | 6 INB− | `OPAMP_B_PARK` (→ Pin 7) |
+| U1 | 7 OUTB | `OPAMP_B_PARK` (→ Pin 6) |
+| U1 | 8 VDD | `+3V3` |
+| R3 1,5k | 1 | `AMP_IN_N` |
+| R3 1,5k | 2 | `GAIN_RC` |
+| C4 100n | 1 | `GAIN_RC` |
+| C4 100n | 2 | `GND` |
+| R4 150k | 1 | `AMP_IN_N` |
+| R4 150k | 2 | `AMP_OUT` |
+| D1 BAT54 | Anode | `AMP_OUT` |
+| D1 BAT54 | Kathode | `ADC_TRIG_OUT` |
+| C2 10n | 1 | `ADC_TRIG_OUT` |
+| C2 10n | 2 | `GND` |
+| R5 100k | 1 | `ADC_TRIG_OUT` |
+| R5 100k | 2 | `GND` |
+| C3 100n | 1 | `+3V3` |
+| C3 100n | 2 | `GND` |
+
+> **EasyEDA-Tipp:** Netze als **benannte Labels** anlegen (`+3V3`, `GND`, `MIC_RAW`, `AMP_IN_P`,
+> `AMP_IN_N`, `GAIN_RC`, `AMP_OUT`, `ADC_TRIG_OUT`) — gleiche Labelnamen sind automatisch verbunden,
+> du musst keine langen Leitungen ziehen. Netznamen entsprechen §4.
+
