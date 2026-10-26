@@ -13,6 +13,7 @@
 | Modul | Datei | Status |
 |---|---|---|
 | Stromversorgung (2S2P-LiPo, SMD-Buck) | [`power_design.md`](power_design.md) | Entwurf |
+| Akustischer Schussknall-Trigger | [`akustik_trigger.md`](akustik_trigger.md) | Entwurf |
 | Weitere Funktionen (z. B. PIR, Tasten) | — | geplant (Kandidaten aus der README-Roadmap) |
 
 ## Grundsätze der Platine

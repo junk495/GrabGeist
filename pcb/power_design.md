@@ -47,7 +47,8 @@
 | Ref | Bauteil | Wert/Parameter | Gehäuse | Bemerkung |
 |---|---|---|---|---|
 | J1 | Batterie-Anschluss | JST-XH 2-pol | SMD | zur 18650-Halterung (oder XT30) |
-| Q1 | P-MOSFET (Verpolungsschutz) | AO3401A | SOT-23 | Source=BAT+, Drain=V_BAT, Gate→GND (100k); alternativ Schottky SS34 |
+| Q1 | P-MOSFET (Verpolungsschutz) | AO3401A | SOT-23 | siehe §5.2 (Source=BAT+, Drain=VCC) |
+| RG | Gate-Widerstand | 100 k | 0603 | Q1 Gate → GND |
 | F1 | Sicherung | PTC 3 A | 1812 | rücksetzbar, Kurzschlussschutz |
 | C1 | Bulk-Elko (Eingang) | 470 µF / 16 V | SMD-Elko | Stützkapazität für Servo-Spitzen |
 | C2 | Keramik | 100 nF / 16 V | 0603 | parallel zu C1 |
@@ -113,6 +114,104 @@ GND (4) ─── GND
 
 > Pin-Nummerierung und Beschaltungsbild im EasyEDA-Pro-Symbol (LCSC-Bauteil AP63205WU-7)
 > und dem verlinkten Datenblatt gegenprüfen.
+
+### 5.2 Verpolungsschutz (P-MOSFET) & Sicherung
+
+**Bauteile:** Q1 = AO3401A (P-Kanal, SOT-23), RG = 100 kΩ, F1 = PTC 3 A.
+
+**AO3401A Pinbelegung (SOT-23, Top View):**
+
+```
+        1                2
+      Gate             Source
+      ┌───────────────────────┐
+      │        AO3401A        │
+      └───────────────────────┘
+                    3
+                  Drain
+```
+
+**Verdrahtung:**
+
+```
+Batterie+ (CN-VBat.2) ──► F1 (PTC 3 A) ──► Q1.Source (Pin 2)
+                                            Q1.Drain (Pin 3) ──► VCC (geschützt)
+                                            Q1.Gate (Pin 1) ──► RG (100 kΩ) ──► GND
+Batterie− (CN-VBat.1) ─────────────────────────────────────────────────────► GND
+```
+
+- **Q1 Pin 2 (Source)** → über F1 an Batterie-Plus (Source an den Akku, nicht an die Last!).
+- **Q1 Pin 3 (Drain)** → `VCC` (geschützte Schiene: C1/Bulk, Buck U2, Servo V+).
+- **Q1 Pin 1 (Gate)** → über RG = 100 kΩ nach GND.
+- **F1 (PTC 3 A)** in die Plus-Leitung, direkt nach dem Batteriestecker.
+- Bulk-Elko auf die **geschützte `VCC`-Seite** (nach Q1), parallel zu C1.
+
+**Funktion:**
+- Richtige Polung: Source = +U, Gate = 0 V → Vgs = −U → P-Kanal leitet (Rds(on) ≈ 50 mΩ).
+- Falsche Polung: Vgs ≥ 0 → sperrt, Body-Diode sperrt ebenfalls → kein Strom.
+
+**Hinweise:**
+- Zener zur Vgs-Klemme ist bei 2S (≤ 8,4 V) **nicht** nötig.
+- Einfachste Alternative: Schottky SS34 in Serie (~0,4 V Abfall) — verliert aber Spannung.
+
+### 5.3 LCSC-Suchbegriffe (Bauteilbeschaffung)
+
+| Bauteil | Suchbegriff bei LCSC | Filter / Spezifikation |
+|---|---|---|
+| 5V-Buck (U1) | `AP63205WU-7` | Diodes, TSOT-23-6, fest 5 V, 2 A |
+| P-MOSFET (Q1) | `AO3401A` | SOT-23, P-Kanal, Vds −30 V, Id −4 A |
+| PTC (F1) | `1812L300/24GR` (LUTE, LCSC C20627123) | 3 A haltend / 5 A Trip / 24 V / 1812 |
+| Induktivität (L1) | `10uH power inductor 2A` | 10 µH, Isat ≥ 2 A, geschirmt, 7,3×7,3 |
+| CIN | `10uF 0805 25V` | X5R/X7R, 0805 |
+| COUT | `22uF 0805 16V` | X5R/X7R, 0805 |
+| Keramik 100nF (CBST/Entkopplung) | `100nF 0603 16V` | X7R, 0603 |
+| Bulk-Elko | `470uF 16V SMD electrolytic` | ≥ 16 V (besser 25 V), SMD |
+| Servo-Elko | `100uF 16V SMD electrolytic` | ≥ 16 V, SMD |
+| Widerstand 100k (RG/R1/R2) | `100k 0603 1%` | 0603, 1 % |
+| Widerstand 47k (R3) | `47k 0603 1%` | 0603, 1 % |
+| Batterie-Stecker | `XH 2P SMD` (z. B. `S2B-XH-SM4-TB`) | 2,54 mm, 2-pol |
+| Servo-Stecker | `2.54 3P SMD` (oder `XH 3P`) | 2,54 mm, 3-pol |
+
+> Bei LCSC die MPN/den Suchbegriff eingeben; die `C…`-Nummer erscheint im Treffer.
+> Für Keramik-/Widerstände Marken wie Samsung/Murata/TDK/Sunlord/UniOhm wählen.
+
+### 5.4 Spannungsteiler (ADC-Spannungsmessung)
+
+**Bauteile:** R2 = 100 kΩ (oben), R3 = 47 kΩ (unten), C8 = 100 nF (Filter).
+
+**Verdrahtung:**
+
+```
+V_BAT (geschützte VCC) ──► R2 (100 k) ──┬──► GPIO6 (ADC1_CH5)
+                                         │
+                                         R3 (47 k)
+                                         │
+                                         GND
+                                         │
+                                         C8 (100 nF)   (parallel zu R3, nah am GPIO)
+                                         │
+                                         GND
+```
+
+- **R2 (100 k):** V_BAT → Mittenknoten.
+- **R3 (47 k):** Mittenknoten → GND.
+- **GPIO6 (ADC1_CH5):** an den Mittenknoten.
+- **C8 (100 nF):** Mittenknoten → GND (Rauschfilter + Puffer für den ADC-Sample).
+
+**Teilerverhältnis & Spannungen:** `V_ADC = V_BAT × 47 / 147 = V_BAT × 0,32`
+
+| Batterie | V_ADC | Bedeutung |
+|---|---|---|
+| 8,4 V (voll) | 2,69 V | oberes Ende (sicher unter 3,1 V) |
+| 6,8 V | 2,17 V | Hysterese „wieder frei" |
+| 6,4 V | 2,05 V | **Cutoff** (~3,2 V/Zelle) |
+| 6,0 V | 1,92 V | hartes Minimum (~3,0 V/Zelle) |
+
+**Hinweise:**
+- Abgriff auf der **geschützten/geschalteten `VCC`** (nach PTC + Q1, hinter dem Hauptschalter), damit im „Aus"-Zustand nichts entlädt (Ruhestrom ~57 µA).
+- Rückrechnung: `V_BAT = V_ADC × 3,128`.
+- Firmware (später): `analogReadMilliVolts(GPIO6)` (11 dB) → `× 3,128 / 1000`. Cutoff ~6,4 V, Hysterese ~6,8 V.
+- Einmal gegen Multimeter kalibrieren (1 %-Widerstände + ADC-Offset).
 
 ## 6. Verbindungen / Pinbelegung
 
