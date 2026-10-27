@@ -37,7 +37,7 @@
 
 - PWM wie die großen Servos: **50 Hz**, **14 Bit** LEDC, Pulsbreite **500–2500 µs**.
 - 3,3-V-Signalpegel reicht für den SG90.
-- GPIO8 ist **kein Strapping-Pin** und aktuell frei (kein Konflikt mit GPIO4/5/6/7/15/16).
+- GPIO8 ist **kein Strapping-Pin** und frei (kein Konflikt mit GPIO1/4/5/6/15/16).
 
 ## 5. Hinweise
 

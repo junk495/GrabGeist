@@ -11,8 +11,8 @@
 
 ```
 ESP32-S3 (U1)          SN65HVD230 (U4)              Bus-Stecker (CN_CAN)
-GPIO15 ──CAN_TX──► U4.1 (D)           U4.7 (CANH) ──► CAN_H  (Pin 1)
-GPIO16 ◄─CAN_RX── U4.4 (R)           U4.6 (CANL) ──► CAN_L  (Pin 2)
+GPIO21 ──CAN_TX──► U4.1 (D)           U4.7 (CANH) ──► CAN_H  (Pin 1)
+GPIO47 ◄─CAN_RX── U4.4 (R)           U4.6 (CANL) ──► CAN_L  (Pin 2)
                       U4.3 (VCC) ── +3V3             GND ───► GND   (Pin 3)
                       U4.2 (GND) ── GND
                       U4.8 (Rs)  ── GND
@@ -34,10 +34,10 @@ GPIO16 ◄─CAN_RX── U4.4 (R)           U4.6 (CANL) ──► CAN_L  (Pin 2
 
 | Pin | Name | Funktion | Anschluss |
 |---|---|---|---|
-| 1 | D (TXD) | Treiber-Eingang | GPIO15 (`CAN_TX`) |
+| 1 | D (TXD) | Treiber-Eingang | GPIO21 (`CAN_TX`) |
 | 2 | GND | Masse | GND |
 | 3 | VCC | Versorgung 3,3 V | +3V3 (C13 → GND) |
-| 4 | R (RXD) | Empfänger-Ausgang | GPIO16 (`CAN_RX`) |
+| 4 | R (RXD) | Empfänger-Ausgang | GPIO47 (`CAN_RX`) |
 | 5 | Vref | Referenz-Ausgang (VCC/2) | **offen (NC)** |
 | 6 | CANL | Bus Low | CAN_L |
 | 7 | CANH | Bus High | CAN_H |
@@ -49,8 +49,8 @@ GPIO16 ◄─CAN_RX── U4.4 (R)           U4.6 (CANL) ──► CAN_L  (Pin 2
 |---|---|
 | +3V3 | U4.3 (VCC), C13.1 |
 | GND | U4.2 (GND), U4.8 (Rs), C13.2, CN_CAN.3, D2.3 |
-| CAN_TX | U1.15 (GPIO15), U4.1 (D) |
-| CAN_RX | U1.16 (GPIO16), U4.4 (R) |
+| CAN_TX | U1.27 (GPIO21), U4.1 (D) |
+| CAN_RX | U1.28 (GPIO47), U4.4 (R) |
 | CAN_H | U4.7 (CANH), CN_CAN.1, D2.1, R8.1 |
 | CAN_L | U4.6 (CANL), CN_CAN.2, D2.2, JP_CAN.2 |
 | CAN_TERM | R8.2, JP_CAN.1 — Reihenschaltung R8 + Jumper zwischen CAN_H/CAN_L |
@@ -74,12 +74,12 @@ GPIO16 ◄─CAN_RX── U4.4 (R)           U4.6 (CANL) ──► CAN_L  (Pin 2
 
 | Funktion | ESP32-S3-Pin | Netz | Konstante (später) |
 |---|---|---|---|
-| CAN TX | **GPIO15** | CAN_TX | neu |
-| CAN RX | **GPIO16** | CAN_RX | neu |
+| CAN TX (D) | **GPIO21** | CAN_TX | neu |
+| CAN RX (R) | **GPIO47** | CAN_RX | neu |
 
-- ESP32-S3 stellt den **TWAI**-Controller („CAN") bereit; die Pins sind über die GPIO-Matrix frei wählbar (hier GPIO15/16).
-- GPIO15/16 sind **keine Strapping-Pins** und aktuell frei (GPIO4/5 = Servos, GPIO6/7 = ADC).
-- Pin-Nummern im Schema folgen der DevKit-Footprint-Konvention (GPIO-N = Pin-N, wie U1.4=GPIO4 …) — gegen das Footprint prüfen.
+- ESP32-S3 stellt den **TWAI**-Controller („CAN") bereit; die Pins sind über die GPIO-Matrix frei wählbar (hier GPIO21/47).
+- GPIO21/47 sind **keine Strapping-Pins**; GPIO47 ist `SPICLK_P` (differentieller Flash-Takt), auf dem WROOM-1-N16R8 aber frei (Single-Ended-Takt).
+- Achtung: Die Footprint-Pin-Nummern des DevKit-Symbols entsprechen **nicht** den GPIO-Nummern (z. B. GPIO1 = Pin 41) — im Symbol prüfen.
 
 ## 8. LCSC-Suchbegriffe
 

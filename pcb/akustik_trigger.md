@@ -63,7 +63,7 @@
 | AMP_IN_N | U3.2 (INA−), R6.2, R7.2 |
 | GAIN_RC | R6.1, C8.2 — R6 nicht direkt an GND, sondern über C8 |
 | AMP_OUT | U3.1 (OUTA), R7.1, D1.2 (Anode) |
-| ADC_TRIG_OUT | D1.1 (Kathode), C9.1, R1.1, U1.7 (GPIO7) |
+| ADC_TRIG_OUT | D1.1 (Kathode), C9.1, R1.1, U1.1 (GPIO1) |
 | OPAMP_B_PARK | U3.6 (INB−), U3.7 (OUTB) — ungenutzten Kanal als Follower terminieren |
 
 ## 5. Layout-Regeln
@@ -77,7 +77,7 @@
 
 ## 6. Firmware-Schnittstelle (später)
 
-- Signal: 0 … 3,1 V an ADC_TRIG_OUT (GPIO7, ADC1_CH6, 11-dB-Dämpfung).
+- Signal: 0 … 3,1 V an ADC_TRIG_OUT (GPIO1, ADC1_CH0, 11-dB-Dämpfung).
 - Polling `analogRead()` alle 250–500 µs im Zustand ARMED.
 - Lockout während der Bewegung (RUNNING/HOMING); nach Stopp 300–500 ms Settling, dann wieder ARMEN.
 
@@ -85,7 +85,8 @@
 
 - **+3V3** vom 3V3-Pin des DevKit (Bord-LDO); Zusatzstrom ~0,6 mA (OpAmp ~0,1 mA + Mikro ~0,5 mA).
 - **Gemeinsame GND-Fläche** (wie in `power_design.md`).
-- **ADC-Pin: GPIO7 (ADC1_CH6)** — frei (GPIO4/5 = Servos, GPIO6 = Akku-Teiler); bewusst **ADC1**, weil **ADC2** bei aktivem Wi-Fi/BLE blockiert ist; GPIO7 ist kein Strapping-Pin.
+- **ADC-Pin: GPIO1 (ADC1_CH0)** — frei und auf der **J2-Seite** (wie GPIO35–42); GPIO4/5 = Servos,
+  GPIO6 = Akku-Teiler, GPIO8 = SG90. Bewusst **ADC1**, weil **ADC2** bei aktivem Wi-Fi/BLE blockiert ist.
 - Referenz: `power_design.md` (Versorgung, Masse, DevKit-Sockel).
 
 ## 8. LCSC-Suchbegriffe
@@ -119,7 +120,7 @@
 **Signalfluss:**
 
 ```
-MIC1 / CN-Elektret ──► [C7/R5 Hochpass] ──► [U3A Verstärker] ──► [D1/C9/R1 Peak] ──► ADC (GPIO7)
+MIC1 / CN-Elektret ──► [C7/R5 Hochpass] ──► [U3A Verstärker] ──► [D1/C9/R1 Peak] ──► ADC (GPIO1)
 Elektret              fc ≈ 1,6 kHz            AC ×101 / DC ×1        τ ≈ 1 ms           0–3,1 V
 ```
 

@@ -218,14 +218,15 @@ VCC (geschützt) ──► R2 (100 k) ──┬──► GPIO6 (ADC1_CH5)
 | Linker Servo (PWM) | **GPIO4** | `PIN_SERVO_LEFT` |
 | Rechter Servo (PWM) | **GPIO5** | `PIN_SERVO_RIGHT` |
 | Batteriespannung (ADC) | **GPIO6** (ADC1_CH5) | neu (Firmware-Patch, später) |
-| CAN TX | **GPIO15** | neu (siehe `can_bus.md`) |
-| CAN RX | **GPIO16** | neu (siehe `can_bus.md`) |
+| Akustik-Trigger (ADC) | **GPIO1** (ADC1_CH0) | neu (siehe `akustik_trigger.md`) |
+| CAN TX (D) | **GPIO21** | neu (siehe `can_bus.md`) |
+| CAN RX (R) | **GPIO47** | neu (siehe `can_bus.md`) |
 | SG90-Servo (PWM) | **GPIO8** | neu (siehe `sg90_servo.md`) |
 
 - PWM: **50 Hz**, **14 Bit** (LEDC), Pulsbreite 500–2500 µs (`SERVO_RES_BITS = 14`).
 - 5 V vom Buck auf den **5V-Pin** (nicht 3V3). Ein gemeinsamer Ground für alles.
-- **GPIO7 (ADC1_CH6)** = Akustik-Trigger (siehe `akustik_trigger.md`).
-- Im konsolidierten Schema: DevKit = **U1** (U1.4=GPIO4, U1.5=GPIO5, U1.6=GPIO6, U1.7=GPIO7, U1.8=GPIO8, U1.15=GPIO15, U1.16=GPIO16, U1.21=5V).
+- **GPIO1 (ADC1_CH0)** = Akustik-Trigger (siehe `akustik_trigger.md`).
+- Im konsolidierten Schema: DevKit = **U1**; Footprint-Pin ≠ GPIO-Nummer (U1.1=3V3, U1.4=GPIO4, U1.5=GPIO5, U1.6=GPIO6, U1.12=GPIO8, U1.21=5V, U1.22=GND, U1.27=GPIO21, U1.28=GPIO47, U1.41=GPIO1).
 
 ## 7. Spannungsüberwachung (ADC-Teiler)
 
