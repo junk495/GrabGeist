@@ -134,21 +134,21 @@ GND (4) ─── GND
 **Verdrahtung:**
 
 ```
-Batterie+ (CN-VBat.2) ──► F1 (PTC 3 A) ──► Q1.Source (Pin 2)
-                                            Q1.Drain (Pin 3) ──► VCC (geschützt)
+Batterie+ (CN-VBat.2) ──► F1 (PTC 3 A) ──► Q1.Drain (Pin 3)
+                                            Q1.Source (Pin 2) ──► VCC (geschützt)
                                             Q1.Gate (Pin 1) ──► RG (100 kΩ) ──► GND
 Batterie− (CN-VBat.1) ─────────────────────────────────────────────────────► GND
 ```
 
-- **Q1 Pin 2 (Source)** → über F1 an Batterie-Plus (Source an den Akku, nicht an die Last!).
-- **Q1 Pin 3 (Drain)** → `VCC` (geschützte Schiene: C1/Bulk, Buck U2, Servo V+).
+- **Q1 Pin 3 (Drain)** → über F1 an Batterie-Plus (Drain an den Akku, Source an die Last).
+- **Q1 Pin 2 (Source)** → `VCC` (geschützte Schiene: C1/Bulk, Buck U2, Servo V+).
 - **Q1 Pin 1 (Gate)** → über RG = 100 kΩ nach GND.
 - **F1 (PTC 3 A)** in die Plus-Leitung, direkt nach dem Batteriestecker.
 - Bulk-Elko auf die **geschützte `VCC`-Seite** (nach Q1), parallel zu C1.
 
 **Funktion:**
-- Richtige Polung: Source = +U, Gate = 0 V → Vgs = −U → P-Kanal leitet (Rds(on) ≈ 50 mΩ).
-- Falsche Polung: Vgs ≥ 0 → sperrt, Body-Diode sperrt ebenfalls → kein Strom.
+- Richtige Polung: Body-Diode (Anode = Drain → Kathode = Source) hebt `VCC` kurz an; danach Vgs = −U (Gate = 0 V) → P-Kanal schaltet voll durch (Rds(on) ≈ 50 mΩ), Strom Drain → Source.
+- Falsche Polung: Kanal sperrt (Vgs ≥ 0); die Body-Diode (Anode = Drain, Kathode = Source) liegt in Sperrrichtung → kein Strom, Last bleibt geschützt.
 
 **Hinweise:**
 - Zener zur Vgs-Klemme ist bei 2S (≤ 8,4 V) **nicht** nötig.
