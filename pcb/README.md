@@ -6,14 +6,18 @@
 
 ## Status
 
-**In Planung.** Bausteine: **Stromversorgung** (`power_design.md`) und **Akustischer Schussknall-Trigger** (`akustik_trigger.md`).
+**Schema steht (EasyEDA).** Stromversorgung und Akustik-Trigger sind zu einer **konsolidierten
+Netzliste** zusammengeführt (RefDes übergreifend). Offen: Layout/Routing sowie die offenen Punkte
+aus `power_design.md` §10.
 
 ## Module
 
 | Modul | Datei | Status |
 |---|---|---|
-| Stromversorgung (2S2P-LiPo, SMD-Buck) | [`power_design.md`](power_design.md) | Entwurf |
-| Akustischer Schussknall-Trigger | [`akustik_trigger.md`](akustik_trigger.md) | Entwurf |
+| Stromversorgung (2S2P-LiPo, SMD-Buck) | [`power_design.md`](power_design.md) | Schema |
+| Akustischer Schussknall-Trigger | [`akustik_trigger.md`](akustik_trigger.md) | Schema |
+| CAN-Bus-Schnittstelle (SN65HVD230) | [`can_bus.md`](can_bus.md) | Schema |
+| Zusatz-Servo SG90 (5-V-Mikroservo) | [`sg90_servo.md`](sg90_servo.md) | Schema |
 | Weitere Funktionen (z. B. PIR, Tasten) | — | geplant (Kandidaten aus der README-Roadmap) |
 
 ## Grundsätze der Platine
