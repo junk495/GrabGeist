@@ -215,18 +215,22 @@ VCC (geschützt) ──► R2 (100 k) ──┬──► GPIO6 (ADC1_CH5)
 
 | Funktion | ESP32-S3-Pin | Konstante in `../src/main.cpp` |
 |---|---|---|
-| Linker Servo (PWM) | **GPIO4** | `PIN_SERVO_LEFT` |
-| Rechter Servo (PWM) | **GPIO5** | `PIN_SERVO_RIGHT` |
+| Linker Servo (PWM) | **GPIO5** | `PIN_SERVO_LEFT` |
+| Rechter Servo (PWM) | **GPIO4** | `PIN_SERVO_RIGHT` |
 | Batteriespannung (ADC) | **GPIO6** (ADC1_CH5) | neu (Firmware-Patch, später) |
 | Akustik-Trigger (ADC) | **GPIO1** (ADC1_CH0) | neu (siehe `akustik_trigger.md`) |
 | CAN TX (D) | **GPIO21** | neu (siehe `can_bus.md`) |
 | CAN RX (R) | **GPIO47** | neu (siehe `can_bus.md`) |
 | SG90-Servo (PWM) | **GPIO8** | neu (siehe `sg90_servo.md`) |
+| Buzzer (PWM) | **GPIO38** | neu (siehe `buzzer.md`) |
+| GPIO-Leiste (4× frei, ADC1) | **GPIO2 / GPIO7 / GPIO9 / GPIO10** | neu (frei verfügbar) |
+| UART TX | **GPIO43** (U0TXD) | neu (Debug-Header `CN-UART`) |
+| UART RX | **GPIO44** (U0RXD) | neu (Debug-Header `CN-UART`) |
 
 - PWM: **50 Hz**, **14 Bit** (LEDC), Pulsbreite 500–2500 µs (`SERVO_RES_BITS = 14`).
 - 5 V vom Buck auf den **5V-Pin** (nicht 3V3). Ein gemeinsamer Ground für alles.
 - **GPIO1 (ADC1_CH0)** = Akustik-Trigger (siehe `akustik_trigger.md`).
-- Im konsolidierten Schema: DevKit = **U1**; Footprint-Pin ≠ GPIO-Nummer (U1.1=3V3, U1.4=GPIO4, U1.5=GPIO5, U1.6=GPIO6, U1.12=GPIO8, U1.21=5V, U1.22=GND, U1.27=GPIO21, U1.28=GPIO47, U1.41=GPIO1).
+- Im konsolidierten Schema: DevKit = **U1** (Footprint-Pin ≠ GPIO-Nummer). Belegte Pins siehe `esp32_devkit.md`.
 
 ## 7. Spannungsüberwachung (ADC-Teiler)
 

@@ -29,8 +29,8 @@
 // Pinbelegung (am Modell verifiziert).
 // GPIOs ohne Konflikt mit Boot-Strapping-/Flash-/PSRAM-/UART0-/USB-Belegung.
 // ---------------------------------------------------------------------------
-static const uint8_t PIN_SERVO_LEFT  = 4;
-static const uint8_t PIN_SERVO_RIGHT = 5;
+static const uint8_t PIN_SERVO_LEFT  = 5;
+static const uint8_t PIN_SERVO_RIGHT = 4;
 
 // ---------------------------------------------------------------------------
 // PWM (LEDC) fuer 270-Grad-RC-Servos: 50 Hz, 14 Bit.

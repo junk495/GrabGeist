@@ -44,8 +44,8 @@ Die Signal-Pins sind in `src/main.cpp` als Konstanten definiert:
 
 | Funktion | ESP32-S3 Pin | Konstante in `main.cpp` |
 |----------|--------------|--------------------------|
-| Linker Servo (PWM-Signal)  | **GPIO4** | `PIN_SERVO_LEFT`  |
-| Rechter Servo (PWM-Signal) | **GPIO5** | `PIN_SERVO_RIGHT` |
+| Linker Servo (PWM-Signal)  | **GPIO5** | `PIN_SERVO_LEFT`  |
+| Rechter Servo (PWM-Signal) | **GPIO4** | `PIN_SERVO_RIGHT` |
 
 PWM-Parameter (LEDC): **50 Hz**, **16 Bit** Auflösung, Pulsbreite **500–2500 µs**
 (→ in `main.cpp`: `SERVO_FREQ_HZ = 50`, `SERVO_RES_BITS = 16`).

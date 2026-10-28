@@ -10,7 +10,7 @@
 
 ## 1. Signalweg
 
-1. Elektret-Mikrofon mit DC-Bias (R4 = 2,2 kΩ nach +3V3, über CN-Jumper).
+1. Elektret-Mikrofon mit DC-Bias (R4 = 2,2 kΩ nach +3V3, über JP-MIC_PWR).
 2. RC-Hochpass 1. Ordnung (C7/R5, fc ≈ 1,59 kHz) — filtert Wind, Trittschall, Motorenbrumm.
 3. Nicht-invertierender Verstärker (U3A): **AC-Gain G = 1 + R7/R6 = 101 ≈ 40 dB, DC-Gain = 1**
    (durch C8 in Reihe zu R6). R6 + C8 bilden einen **2. Hochpass** (fc ≈ 1,06 kHz).
@@ -23,9 +23,9 @@
 |---|---|---|---|
 | U3 | **MCP602-I/SN** (LCSC C29605; alternativ MCP6002) | SOIC-8 | Dual Rail-to-Rail-I/O-OpAmp, 2,8 MHz GBW, 3,3-V-tauglich; **kein** LM358 |
 | MIC1 | Elektret-Kapsel **GMI9745P-2C44DB** (INGHAi, LCSC C530035) | THT 9,7 mm | Variante A: Kapsel direkt auf der Platine |
-| CN-Elektret | 2-Pin-Header (JST-XH) | THT 2,54 mm | Variante B: externe Kapsel über verdrilltes Kabel |
-| CN-Jumper | Lötbrücke / Jumper (optional) | SMD | in Serie zu R4 (trennt Bias, falls Piezo statt Elektret) |
-| D1 | **BAT54** (SOD-523F, LCSC C283259) — alternativ BAT43/BAT43W | SOD-523F / DO-35 / SOD-123 | Kleinsignal-Schottky (40 V, 300 mA), Spitzenwertgleichrichter |
+| CN-MIC1 | 2-Pin-Header (JST-XH) | THT 2,54 mm | Variante B: externe Kapsel über verdrilltes Kabel |
+| JP-MIC_PWR | Lötbrücke / Jumper (optional) | THT 2,54 mm | in Serie zu R4 (trennt Bias, falls Piezo statt Elektret) |
+| D1 | **BAT54W** (SOD-123, LCSC C7502705) | SOD-123 | Kleinsignal-Schottky (30 V, 200 mA), Spitzenwertgleichrichter |
 | R4 | 2,2 kΩ | 0805 | Mikrofon-Bias nach +3V3 |
 | R5 | 10 kΩ | 0805 | Hochpass + DC-Arbeitspunkt (0 V) für INA+ |
 | R6 | 1,5 kΩ | 0805 | Gain-Fußpunkt (AC) — in Serie mit C8 nach GND |
@@ -36,8 +36,8 @@
 | C6 | 100 nF (X7R) | 0805 | Decoupling für U3 (nah an Pin 8) |
 | C8 | 100 nF (X7R) | 0805 | in Reihe zu R6 → DC-Gain = 1 + 2. Hochpass (fc ≈ 1,06 kHz) |
 
-> **Mikrofon-Varianten:** MIC1 und CN-Elektret liegen parallel auf `MIC_RAW`. Es wird **nur eine**
-> Variante bestückt: MIC1 = Kapsel auf der Platine, CN-Elektret = externe Kapsel über Kabel.
+> **Mikrofon-Varianten:** MIC1 und CN-MIC1 liegen parallel auf `MIC_RAW`. Es wird **nur eine**
+> Variante bestückt: MIC1 = Kapsel auf der Platine, CN-MIC1 = externe Kapsel über Kabel.
 
 ## 3. MCP6002 / MCP602 — Pinbelegung (SOIC-8)
 
@@ -56,14 +56,14 @@
 
 | Netz | Pins |
 |---|---|
-| +3V3 | U3.8 (VDD), C6.1, CN-Jumper.1 |
-| GND | U3.4 (VSS), U3.5 (INB+), C6.2, C8.1, C9.2, CN-Elektret.2, MIC1.2, R5.1, R1.2 |
-| MIC_RAW | CN-Elektret.1, MIC1.1, R4.2, C7.1 |
+| +3V3 | U3.8 (VDD), C6.1, JP-MIC_PWR.1 |
+| GND | U3.4 (VSS), U3.5 (INB+), C6.2, C8.1, C9.2, CN-MIC1.2, MIC1.2, R5.1, R1.2 |
+| MIC_RAW | CN-MIC1.1, MIC1.1, R4.2, C7.1 |
 | AMP_IN_P | C7.2, R5.2, U3.3 (INA+) |
 | AMP_IN_N | U3.2 (INA−), R6.2, R7.2 |
 | GAIN_RC | R6.1, C8.2 — R6 nicht direkt an GND, sondern über C8 |
 | AMP_OUT | U3.1 (OUTA), R7.1, D1.2 (Anode) |
-| ADC_TRIG_OUT | D1.1 (Kathode), C9.1, R1.1, U1.1 (GPIO1) |
+| ADC_TRIG_OUT | D1.1 (Kathode), C9.1, R1.1, U1.41 (GPIO1) |
 | OPAMP_B_PARK | U3.6 (INB−), U3.7 (OUTB) — ungenutzten Kanal als Follower terminieren |
 
 ## 5. Layout-Regeln
@@ -71,9 +71,9 @@
 - C6 so nah wie möglich zwischen U3 Pin 8 (VDD) und GND.
 - AMP_IN_N / AMP_IN_P (U3 Pin 2/3) extrem kurz führen; **nicht** parallel zu PWM-/Servo-/Buck-Leitungen.
 - Analoge Sektion über geschlossener GND-Fläche, abseits der Servo-Rückströme.
-- **D1-Polarität:** Anode an `AMP_OUT` (D1.2), Kathode an `ADC_TRIG_OUT` (D1.1) — Footprint-Pin 1 = Kathode prüfen.
+- **D1-Polarität:** Anode an `AMP_OUT` (D1.2), Kathode an `ADC_TRIG_OUT` (D1.1) — im SOD-123-Footprint Kathode (Ring) prüfen.
 - Mikrofon-Varianten: **MIC1** direkt bestücken (Kapsel auf der Platine) **oder** Kapsel über
-  **CN-Elektret** mit kurzem verdrilltem Kabel anschließen und in Schaumstoff lagern (Körper-/Windentkopplung).
+  **CN-MIC1** mit kurzem verdrilltem Kabel anschließen und in Schaumstoff lagern (Körper-/Windentkopplung).
 
 ## 6. Firmware-Schnittstelle (später)
 
@@ -94,7 +94,7 @@
 | Bauteil | Suchbegriff | Filter |
 |---|---|---|
 | OpAmp | `MCP602-I/SN` (LCSC C29605) / `MCP6002` | SOIC-8, Rail-to-Rail I/O |
-| Schottky | `BAT54` (SOD-523F, LCSC C283259) / `BAT43` / `BAT43W` | Kleinsignal, VF ≈ 0,3 V |
+| Schottky | `BAT54W` (SOD-123, LCSC C7502705) / `BAT43` / `BAT43W` | Kleinsignal, VF ≈ 0,3 V |
 | Mikrofon-Stecker | `XH 2P` | JST-XH 2-pol |
 | Elektret-Mikrofon | `GMI9745P-2C44DB` (INGHAi, LCSC C530035) | 9,7 mm, omnidirektional, −44 dB, 2-pol, **THT/Plug-in, 2,54 mm** |
 | R 2,2k / 10k / 1,5k / 150k / 100k | `2.2k 0805 1%` … | 0805, 1 % |
@@ -108,10 +108,10 @@
   der Offset-Anteil am Ausgang liegt dann nur noch bei ~Vos (mV-Bereich) statt ×101.
 - **BAT43/BAT54 statt 1N5819:** Die 1N5819 (1-A-Netzteil-Diode) hat ~110 pF Sperrschichtkapazität und
   hohen Rückwärts-Leckstrom — die Ladung in C9 würde rückwärts durch die „sperrende" Diode abfließen.
-  BAT43 (DO-35) / BAT43W (SOD-123) / BAT54 (SOT-23/SOD-523F) sind Kleinsignal-Schottkys (~7–10 pF, minimaler Leckstrom).
+  BAT43 (DO-35) / BAT43W (SOD-123) / BAT54W (SOD-123) sind Kleinsignal-Schottkys (~7–10 pF, minimaler Leckstrom).
 - **Sättigung ist ok:** Bei einem lauten Knall klippt der Verstärker an der Rail; für eine reine
   Schwellen-Erkennung unkritisch.
-- **Mikrofon-Varianten:** entweder MIC1 (Kapsel auf der Platine) **oder** CN-Elektret (externe Kapsel)
+- **Mikrofon-Varianten:** entweder MIC1 (Kapsel auf der Platine) **oder** CN-MIC1 (externe Kapsel)
   bestücken — nicht beide gleichzeitig (teilen sich sonst den Bias-Strom über R4).
 - Optional: Ferrit/RC vor +3V3 der Analogsektion für saubereres AVCC (bei Schwellen-Trigger meist nicht nötig).
 
@@ -120,7 +120,7 @@
 **Signalfluss:**
 
 ```
-MIC1 / CN-Elektret ──► [C7/R5 Hochpass] ──► [U3A Verstärker] ──► [D1/C9/R1 Peak] ──► ADC (GPIO1)
+MIC1 / CN-MIC1 ──► [C7/R5 Hochpass] ──► [U3A Verstärker] ──► [D1/C9/R1 Peak] ──► ADC (GPIO1)
 Elektret              fc ≈ 1,6 kHz            AC ×101 / DC ×1        τ ≈ 1 ms           0–3,1 V
 ```
 
@@ -130,11 +130,11 @@ Elektret              fc ≈ 1,6 kHz            AC ×101 / DC ×1        τ ≈ 
 |---|---|---|
 | MIC1 | + | `MIC_RAW` |
 | MIC1 | − | `GND` |
-| CN-Elektret | 1 | `MIC_RAW` |
-| CN-Elektret | 2 | `GND` |
-| CN-Jumper | 1 | `+3V3` |
-| CN-Jumper | 2 | `R4.1` |
-| R4 2,2k | 1 | `CN-Jumper.2` |
+| CN-MIC1 | 1 | `MIC_RAW` |
+| CN-MIC1 | 2 | `GND` |
+| JP-MIC_PWR | 1 | `+3V3` |
+| JP-MIC_PWR | 2 | `R4.1` |
+| R4 2,2k | 1 | `JP-MIC_PWR.2` |
 | R4 2,2k | 2 | `MIC_RAW` |
 | C7 10n | 1 | `MIC_RAW` |
 | C7 10n | 2 | `AMP_IN_P` |

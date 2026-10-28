@@ -14,10 +14,12 @@ aus `power_design.md` §10.
 
 | Modul | Datei | Status |
 |---|---|---|
+| ESP32-S3-DevKitC-1 (Controller) | [`esp32_devkit.md`](esp32_devkit.md) | Schema |
 | Stromversorgung (2S2P-LiPo, SMD-Buck) | [`power_design.md`](power_design.md) | Schema |
 | Akustischer Schussknall-Trigger | [`akustik_trigger.md`](akustik_trigger.md) | Schema |
 | CAN-Bus-Schnittstelle (SN65HVD230) | [`can_bus.md`](can_bus.md) | Schema |
 | Zusatz-Servo SG90 (5-V-Mikroservo) | [`sg90_servo.md`](sg90_servo.md) | Schema |
+| Buzzer (Melodie, GPIO38) | [`buzzer.md`](buzzer.md) | Schema |
 | Weitere Funktionen (z. B. PIR, Tasten) | — | geplant (Kandidaten aus der README-Roadmap) |
 
 ## Grundsätze der Platine
